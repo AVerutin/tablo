@@ -10,6 +10,7 @@ let s350Queries = {
         "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
     getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly350] ORDER BY [Hour];",
+    resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = 100, [Weight] = 0;",
     tmpQuery: "SELECT\n" +
         "[AllPack].[Size],\n" +
         "[AllPack].[Length],\n" +
@@ -172,6 +173,7 @@ let s350Queries = {
 let s210Queries = {
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
     getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly210] ORDER BY [Hour];",
+    resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = 100, [Weight] = 0;",
     delayQuery: "SELECT [START_DELAY] as start\n" +
         ",[END_DELAY] as finish\n" +
         "\n" +
@@ -357,6 +359,30 @@ const Model = {
         return true;
     },
 
+    resetHourlyStats: async function(local) {
+        // Обнуление почасового произврдства для выбранного стана
+        let res = false;
+        if (local) {
+            // Локальное хранилшище
+                hourlyStore.set('s350', {});
+                hourlyStore.set('s210', {});
+                res = true;
+            } else {
+            // База данных
+                let request = s350.request();
+                let query = await request.query(s350Queries.resetHourStats).catch(e => console.log(e));
+                if (query.rowsAffected[0] > 0) {
+                    res = true;
+                }
+                query = await request.query(s210Queries.resetHourStats).catch(e => console.log(e));
+                if (query.rowsAffected[0] > 0) {
+                    res = true;
+                }
+            }
+            return res;
+        },
+    
+
     // Сохранение подготовленного состояния по всем часам работы бригады
     saveHourlyPercent: async function(stan, data, local, hour) {
         // Сохранение состояния по часам
@@ -364,7 +390,6 @@ const Model = {
             hourlyStore.set(stan, data);
         } else {
             // Сохранение данных в БД
-            // setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
             let request = s350.request();
             request.input('hourPercent', data[hour].Percent);   //  /* Процент выполнения текущего часа */
             request.input('hourWeight', data[hour].Weight);     //  /* Сумма взвешенных пакетов за текущий час */
@@ -483,10 +508,6 @@ const Model = {
         return true;
     },
 
-    resetHourlyStats: async function(brigada) {
-    // Получение производства за смену для указанной бригады
-
-    },
 
     // Определяем номер бригады, которая должна заступить на смену
     getSelectedBrigade: async function(pool) {
@@ -516,8 +537,10 @@ const Model = {
             // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
             if (isSaved) {
                 // Обнуляем почасовую статистику
-                let reset = 0;
-
+                let reset = await this.resetHourlyStats(false);
+                if (reset) {
+                    console.log('Hourly stats was been reseted!');
+                };
             } else {
                 console.log("Error saving current brigade state.");
             };
@@ -527,7 +550,7 @@ const Model = {
 
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
-        const toLocalStorage = true;
+        const toLocalStorage = false;
         let perc = 0;
         let weight =0;
         const timeShift = {
@@ -577,13 +600,13 @@ const Model = {
         let start = await this.getStartHour(finish);
 
         /// START DEBUG
-        start = new Date('2020-06-02 11:00:00');
-        finish = new Date ('2020-06-02 11:59:59');
+        // start = new Date('2020-06-02 11:00:00');
+        // finish = new Date ('2020-06-02 11:59:59');
         /// FINISH DEBUG
 
         var hour = finish.getUTCHours(); 
         // Получаем фактически произведенную продукцию за период
-        fact = await this.getHourlyProd(start, finish);
+        fact = await this.getHourlyProd(start, finish); // Нет стана 210
         if (!fact) {
             return false;
         }
@@ -780,6 +803,7 @@ const Model = {
     },
 
     getProdList: async function(start, finish) {
+        //FIXME: Нет стана 210
         // TODO: Для каждой строки определить:
         // 1) Время начала проката, 
         // 2) Выделить начало часа, в котором катался профиль
@@ -825,7 +849,7 @@ const Model = {
     },
 
     getHourlyProd: async function(start, finish) {
-        // const prof = await this.getProdList('2020-05-29 10:00:00', '2020-05-29 10:59:59');
+        // Нет стана 210
         const prof = await this.getProdList(start, finish);
         if (prof.length > 0) {
             // Ручной расчет проката всех профилей 
