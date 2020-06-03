@@ -296,7 +296,7 @@ const Model = {
                 // Расчет процента выполнения плана за месяц
                 // Для текущей бригады считаем по своему алгоритму,
                 // Для остальных - берем ранее сохраненные данные
-                brig = await brigades.getCurrentBrigade(s350);
+                brig = await this.getSelectedBrigade(s350);
                 let currentData = await this.getDailyPercent(stan);
                 if (!currentData) {
                     stats.plan_perc[brig.ID] = 0;
@@ -524,10 +524,10 @@ const Model = {
         const today = new Date();                       // Текущее время
 
         // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
-        if ( (Number(today) - Number(currBrig.BDate) <= 60000 && !saved) ) {
+        if ( (Number(today) - Number(currBrig.BDate) <= 1200000 && !saved) ) {
             // Бригада работает менее минуты и статус не сохранен
             let shift;
-            if (today.getHours() == 12) {
+            if (today.getHours() == 8) {
                 shift = "Day";
             } else {
                 shift = "Night";

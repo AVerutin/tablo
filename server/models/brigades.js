@@ -29,10 +29,11 @@ const Brigades = {
     getActiveBrigade: async function(pool) {
         // Получить номер активной бригады
         let brig = local.get('Brigada');
+        const currBrig = await this.getCurrentBrigade(pool);
         if (!brig) {
             // активная бригада не была установлена ранее, получаем номер текущей из БД
-            const currBrig = await this.getCurrentBrigade(pool);
-            this.setActiveBrigade(currBrig.ID, false);
+            brig = currBrig.ID;
+            this.setActiveBrigade(brig, false);
         }
 
         // Проверяем, не пришло ли время сменить активную бригаду
@@ -41,7 +42,7 @@ const Brigades = {
         const currMinutes = today.getMinutes();
 
         if ( (currHour == 8) || (currHour == 20) ) { // Определение часа смены бригады
-            if (currMinutes <= 1) {                  // Определение минуты смены бригады  
+            if (currMinutes <= 30) {                  // Определение минуты смены бригады  
                 let brigDate = currBrig.BDate;
                 brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
                 if (Number(today) - Number(brigDate) >= /* 3600000 */ 39600000 ) {  // Определяем время работы бригады, если большее 11 часов, получаем следующую после currBrig
