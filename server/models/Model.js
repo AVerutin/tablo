@@ -1,11 +1,13 @@
 const sql = require('mssql');
+const brigades = require('./brigades');
 const mysql = require('mysql2');
 const config = require('config');
 const store = require('data-store')({ path: process.cwd() + '/delay_plan.json' });
 const hourlyStore = require('data-store')( {path: process.cwd() + '/hourly.json' } );
 
 let s350Queries = {
-    updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BShiftPercent] = @shiftPercent, [BShiftWeight] = @shiftWeight WHERE ID = @currBrigada;",
+    updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = @percent210, [BWeight210] = @weight210, " + 
+        "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
     getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly350] ORDER BY [Hour];",
     tmpQuery: "SELECT\n" +
@@ -18,6 +20,7 @@ let s350Queries = {
         "ORDER BY [AllPack].[DataWeight] ASC;",
     planProd: "SELECT * FROM [L2Mill].[dbo].[Dev_Plan_350_Profiles]",
     brigadeQuery: "SELECT [ID], [BDate] FROM [L2Mill].[dbo].[Brigada] WHERE BCur > 0",
+    allBrigades: "SELECT * FROM [L2Mill].[dbo].[Brigada] ORDER BY [ID]",
     // Получаем список всех остановок стана 350
     delayQuery: "SELECT [DELAY_DATETIME] as start\n" +
         "      ,[FINISH_DELAY_DATETIME] as finish\n" +
@@ -235,7 +238,7 @@ const Model = {
             shift_start: await this.getShiftStart(),
             temp_in: await this.getSPCTemperature(),
             temp_out: await this.getTemperature(),
-            current_brigade: await this.getSelectedBrigade(),
+            current_brigade: await this.getSelectedBrigade(s350), /* brigades.getActiveBrigade(s350), */
             spc_month: 0,
             spc_year: 0,
         };
@@ -251,7 +254,7 @@ const Model = {
             const monthBegin = new Date(today.getFullYear(), today.getMonth() , 1, -4, 0, 0);
             request.input("monthBegin", sql.DateTime, monthBegin);
             let result = await request.query(queries.statsQuery).catch(e =>console.log(e));
-            let plan = await this.getPlanProd(stan, monthBegin, today);
+            // let plan = await this.getPlanProd(stan, monthBegin, today);
             //result.recordsets.forEach(r => console.log(r));
             let stats =  {
                 dev_shift: [0, 0, 0, 0, 0],
@@ -291,9 +294,15 @@ const Model = {
                 // Расчет процента выполнения плана за месяц
                 // Для текущей бригады считаем по своему алгоритму,
                 // Для остальных - берем ранее сохраненные данные
-                let currentPrecent = await this.getDailyPercent(stan);
-                brig = await this.getCurrentBrigada();
-                stats.plan_perc[brig.BCur] = currentPrecent;
+                brig = await brigades.getCurrentBrigade(s350);
+                let currentData = await this.getDailyPercent(stan);
+                if (!currentData) {
+                    stats.plan_perc[brig.ID] = 0;
+                    stats.dev_shift[brig.ID] = 0;
+                } else {
+                    stats.plan_perc[brig.ID] = currentData.Percent;
+                    stats.dev_shift[brig.ID] = currentData.Weight;                    
+                };
                 //stats.plan_perc[row.brigade] = (plan[row.brigade] === 0) ? 100 : Math.round(row.monthWeight/(plan[row.brigade]*10));
             }
             //console.dir(stats);
@@ -395,24 +404,17 @@ const Model = {
     putHour: async function(stan, hour, percent=0, weight=0, local=false) {
         // 1. Получаем сохраненное ранее состояние бригады
         var data = await this.readHourlyPercent(stan, local);
-        // 2. Изменяем значение текущего часа
-        if (!isNaN(percent)) {
-            data[hour].Percent = percent;
-        } else {
+        if (isNaN(percent) || isNaN(weight)) {
             data[hour].Percent = 0;
-        }
-        if (!isNaN(weight)) {
-            data[hour].Weight = weight;
-        } else {
             data[hour].Weight = 0;
-        }
+        } else {
+        // 2. Изменяем значение текущего часа
+            data[hour].Percent = percent;
+            data[hour].Weight = weight;
+        };
         // Записываем состояние по часам в локальное хранилище
         await this.saveHourlyPercent(stan, data, local, hour);
     },
-
-    //////////////////////////////////////////////////////////////////////////
-    // Модуль по сохранению состояния текущей бригады в локальном хранилище //
-    //////////////////////////////////////////////////////////////////////////
 
     // Получение времени начала смены текущей бригады
     getShiftStart: async function() {
@@ -449,114 +451,97 @@ const Model = {
         return new Date(date.setHours(date.getHours()+3));
     },
 
-    getCurrentBrigada: async function() {
-        let data = { };
-
-        let request = s350.request();
-        let result = await request.query(s350Queries.brigadeQuery);
-        for (let row of result.recordset) {
-            data['BCur'] = row.ID;
-            data['BDate'] = row.BDate;
-            data['BDate'].setHours(row.BDate.getUTCHours());
+    // Сохранение состояния текущей бригады
+    saveShiftStat: async function(currBrigada) {
+        let perc350 = 0;
+        let perc210 = 0;
+        let weig350 = 0;
+        let weig210 = 0;
+        let data350 = await this.getDailyPercent('s350');
+        if (data350) {
+            perc350 = data350.Percent;
+            weig350 = data350.Weight;
         }
-        return data;
+        let data210 = await this.getDailyPercent('s210');
+        if (data210) {
+            perc210 = data210.Percent;
+            weig210 = data210.Weight;
+        }
+
+        // Сохраняем процент выполнения и массу проката для стана 350 за смену
+        // Если нет данных о станах, 100% выполнение и 0 тонн
+        let request = s350.request();
+        request.input('percent350', perc350);
+        request.input('weight350', weig350);
+        request.input('percent210', perc210);
+        request.input('weight210', weig210);
+        request.input('currBrigada', currBrigada);
+        let result = await request.query(s350Queries.updateBStats).catch(e => {return false}); 
+        if (result.rowsAffected.length) {
+            brigades.setSaved(true);
+        }
+        return true;
+    },
+
+    resetHourlyStats: async function(brigada) {
+    // Получение производства за смену для указанной бригады
+
     },
 
     // Определяем номер бригады, которая должна заступить на смену
-    getSelectedBrigade: async function() {
-        const now = new Date();
-        let current = 0;
-        let lastID = 0;
-        let lastDate = 0;
-        let currBrigada = await this.getCurrentBrigada();
-        lastID = currBrigada.BCur;
-        lastDate = currBrigada.BDate;
+    getSelectedBrigade: async function(pool) {
+    /* TODO: Получить из модуля brigades флаг состояния бригады (сохранено, или нет)
+    Если даные не сохранены и пришло время сменить бригаду, то сохранить данные, сменить бригаду
+    и обнулить данные по часам */
 
-        // Если предыдущая бригада работает >= 11 часов, то ожидаем смены бригады
-        let workingHours = (now - lastDate) / 3600000;
+        // Проверяем время
+        let currBrig = await brigades.getCurrentBrigade(pool);    // Номер текущей бригады и время начала ее смены
+        let brigDate = currBrig.BDate;
+        brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
+        let activeBrig = await brigades.getActiveBrigade(pool);   // Номер активной бригады
+        let saved = brigades.isSaved();                 // Флаг сохранения текущей бригады;
+        const today = new Date();                       // Текущее время
 
-        if (workingHours >= 11) {
-            let timeShift_start = now;
-            timeShift_start.setHours(20);
-            timeShift_start.setMinutes(0);
-            timeShift_start.setSeconds(0);
-            timeShift_start.setMilliseconds(0);
-            let timeShift_finish = now;
-            timeShift_finish.setHours(20);
-            timeShift_finish.setMinutes(30);
-            timeShift_finish.setSeconds(0);
-            timeShift_finish.setMilliseconds(0);
-    
-            // Заступает бригада в дневную смену
-            if (now >= timeShift_start && now <= timeShift_finish) {
-                // Если время смены бригады
-                // определяем номер бригады, которая заступает на смену
-                switch (lastID) {
-                    case 1 :
-                        current = 4;
-                        break;
-                    case 2 :
-                        current = 1;
-                        break;
-                    case 3 :
-                        current = 2;
-                        break;
-                    case 4 :
-                        current = 3;
-                        break;
-                }
-                //TODO: Сохранение состояния предыдущей бригады
+        // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
+        if ( (Number(today) - Number(currBrig.BDate) <= 60000 && !saved) ) {
+            // Бригада работает менее минуты и статус не сохранен
+            let shift;
+            if (today.getHours() == 12) {
+                shift = "Day";
+            } else {
+                shift = "Night";
+            }
+            let prevBrig = brigades.getPrevBrigade(currBrig.ID, shift);
+            let isSaved = await this.saveShiftStat(prevBrig);
+            // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
+            if (isSaved) {
+                // Обнуляем почасовую статистику
+                let reset = 0;
 
             } else {
-                current = lastID;
-            }
-
-            timeShift_start.setHours(8);
-            timeShift_start.setMinutes(0);
-            timeShift_start.setSeconds(0);
-            timeShift_start.setMilliseconds(0);
-
-            timeShift_finish.setHours(8);
-            timeShift_finish.setMinutes(30);
-            timeShift_finish.setSeconds(0);
-            timeShift_finish.setMilliseconds(0);
-        
-            if (now >= timeShift_start && now <= timeShift_finish) {
-                // Если время смены бригады
-                // определяем номер бригады, которая заступает на смену
-        
-                switch (lastID) {
-                    case 1 :
-                        current = 3;
-                        break;
-                    case 2 :
-                        current = 4;
-                        break;
-                    case 3 :
-                        current = 1;
-                        break;
-                    case 4 :
-                        current = 2;
-                        break;
-                }
-                //TODO: Сохранение состояния предыдущей бригады
-            }
-        } else {
-            current = lastID;
+                console.log("Error saving current brigade state.");
+            };
         }
-        return current;
+        return activeBrig;
     },
 
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
+        const toLocalStorage = true;
+        let perc = 0;
+        let weight =0;
         const timeShift = {
             "Day": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
             "Night": [20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8]
         };
         let curr = [];
 
-        await this.calcPercent(stan); // Заполняем данные по часам
-        let currentShift = await this.getCurrentBrigada();
+        let calc = await this.calcPercent(stan, toLocalStorage); // Заполняем данные по часам
+        if (!calc) {
+            return false;
+        }
+        let data = {};
+        let currentShift = await brigades.getCurrentBrigade(s350);
         let shiftStart = currentShift.BDate;
         shiftStart = shiftStart.getHours();
         if (shiftStart == 8) {
@@ -567,29 +552,41 @@ const Model = {
             curr = timeShift.Night;
         }
 
-        let daily = await this.readHourlyPercent(stan);
-        let perc = 0;
+        let daily = await this.readHourlyPercent(stan, toLocalStorage);
+
         for (day of daily) { 
             if (curr.includes(day.Hour)) {
                 perc += day.Percent;
+                weight += day.Weight;
             }
         }
         perc = Math.round(perc / 12);
-        return perc;
+        data['Percent'] = perc;
+        data['Weight'] = weight;
+        return data;
     },
 
     // Расчет процента выполнения плана за текущий час
-    // и сохранение текущего часа в локальном хранилище
-    calcPercent: async function (stan){
+    // и сохранение текущего часа в локальном хранилище или БД
+    calcPercent: async function (stan, local){
 
         // Определяем начало и конец периода расчета
         // (текущее время и начало отсчета часа)
         let finish = new Date();
         finish = this.toLocalDate(finish);
         let start = await this.getStartHour(finish);
-        var hour = finish.getUTCHours();
+
+        /// START DEBUG
+        start = new Date('2020-06-02 11:00:00');
+        finish = new Date ('2020-06-02 11:59:59');
+        /// FINISH DEBUG
+
+        var hour = finish.getUTCHours(); 
         // Получаем фактически произведенную продукцию за период
         fact = await this.getHourlyProd(start, finish);
+        if (!fact) {
+            return false;
+        }
         // Получаем плановые показатели 
         plan = await this.getProdPlan(stan);
 
@@ -597,12 +594,13 @@ const Model = {
         // TODO: Проход по строкам набора fact, выбор наименования профиля, поиск в таблице плана данный профиль и получение плана
         if (stan == "s350") {
             // Для стана 350
-            var profile;
-            var length;
-            var real_weight;
-            var plan_weight;
+            var profile = '';
+            var length = '';
+            var real_weight = 0;
+            var plan_weight = 0;
             let percent = [];
             for (let row of fact) {
+                // Проверить на наличие записей (при простое возвращается пустой набор)
                 profile = row.Profile;
                 length = Number(row.Length);
                 real_weight = row.Weight;
@@ -618,10 +616,10 @@ const Model = {
                 }
 
                 // Расчитаем, какую часть часа был фактический прокат
-                hourPercent = this.calcHourPart(start, finish);        // сколько процентов в текущем часе работали
-                real_weight = Math.round(real_weight / 1000);       // Пересчитать фактически прокатанное в тонны
-                hourPlan = (plan_weight * hourPercent) / 100;       // Сколько тонн должны были прокатать за это время 
-                perc = (real_weight * 100) / hourPlan;
+                hourPercent = this.calcHourPart(start, finish);       // сколько процентов в текущем часе работали
+                real_weight = Math.round(real_weight / 1000);         // Пересчитать фактически прокатанное в тонны
+                hourPlan = (plan_weight * hourPercent) / 100;         // Сколько тонн должны были прокатать за это время 
+                perc = (real_weight * 100) / hourPlan;                // При простое деление на 0!
                 avg += perc;
                 percent.push(perc);
             }
@@ -629,9 +627,10 @@ const Model = {
             avg = Math.round(avg / percent.length);
         } else {
             // Для стана 210
-        }
-        await this.putHour(stan, hour, avg, real_weight, false);
+            // >>>>>>>>>>>>>>>>>>>>>
 
+        }
+        await this.putHour(stan, hour, avg, real_weight, local);
     },
 
     // Получить температуру воздуха на улице из базы данных
@@ -792,7 +791,7 @@ const Model = {
         // Расчет проката нескольких профилей в течение одного часа
         // Перебираем созданный ранее по всем профилям массив и выбираем строки, у которых 
         // совпадает значение часа, но различается длина и/или профиль
-        
+
         let tmp350 = s350.request();
         tmp350.input("startTS", sql.DateTime, start);
         tmp350.input("finishTS", sql.DateTime, finish);
@@ -828,55 +827,59 @@ const Model = {
     getHourlyProd: async function(start, finish) {
         // const prof = await this.getProdList('2020-05-29 10:00:00', '2020-05-29 10:59:59');
         const prof = await this.getProdList(start, finish);
-        // Ручной расчет проката всех профилей 
-        let weight = 0;
-        let duration = 0;
-        let profile = 0;
-        let length = 0;
-        let hour = '';
-        let hours = [];
-        let rw = {};
-        len = prof.length;
-        // Рассчитываем время фактического проката профиля в течение часа
-        // FIXME: Проверить работу при попадании немеры - длина пореза ND
-        for (let w=0; w<len; ++w) {
-            if (profile == 0 && length == 0) {
-                // Первый прокат в этом часе
-                profile = prof[w].Profile;
-                length = prof[w].Length;
-                weight = prof[w].Weight;
-                duration = prof[w].LengthTs;
-                hour = start.getUTCHours().toString();
-            } else {
-                // Доугой профиль и/ил длина пореза
-                if (profile != prof[w].Profile || length != prof[w].Length) {
-                    rw = {};
-                    rw['Hour'] = hour;
-                    rw['Profile'] = profile;
-                    rw['Length'] = length;
-                    rw['Weight'] = weight;
-                    rw['Duration'] = duration;
-                    hours.push(rw);
+        if (prof.length > 0) {
+            // Ручной расчет проката всех профилей 
+            let weight = 0;
+            let duration = 0;
+            let profile = 0;
+            let length = 0;
+            let hour = '';
+            let hours = [];
+            let rw = {};
+            len = prof.length;
+            // Рассчитываем время фактического проката профиля в течение часа
+            // FIXME: Проверить работу при попадании немеры - длина пореза ND
+            for (let w=0; w<len; ++w) {
+                if (profile == 0 && length == 0) {
+                    // Первый прокат в этом часе
                     profile = prof[w].Profile;
                     length = prof[w].Length;
-                    weight = 0;
-                    duration = 0;
+                    weight = prof[w].Weight;
+                    duration = prof[w].LengthTs;
+                    hour = start.getUTCHours().toString();
                 } else {
-                    weight += prof[w].Weight;
-                    duration += Number(prof[w].LengthTs);
+                    // Доугой профиль и/ил длина пореза
+                    if (profile != prof[w].Profile || length != prof[w].Length) {
+                        rw = {};
+                        rw['Hour'] = hour;
+                        rw['Profile'] = profile;
+                        rw['Length'] = length;
+                        rw['Weight'] = weight;
+                        rw['Duration'] = duration;
+                        hours.push(rw);
+                        profile = prof[w].Profile;
+                        length = prof[w].Length;
+                        weight = 0;
+                        duration = 0;
+                    } else {
+                        weight += prof[w].Weight;
+                        duration += Number(prof[w].LengthTs);
+                    }
                 }
             }
+            rw = {};
+            rw['Hour'] = hour;
+            rw['Profile'] = profile;
+            rw['Length'] = length;
+            rw['Weight'] = weight;
+            rw['Duration'] = duration;
+            hours.push(rw);     
+            // Массив hours содержит данные о продолжительности праката различных профилей в течение часа
+            // Если hours путой - вернуть false
+            return hours;
+        } else {
+            return false;
         }
-        rw = {};
-        rw['Hour'] = hour;
-        rw['Profile'] = profile;
-        rw['Length'] = length;
-        rw['Weight'] = weight;
-        rw['Duration'] = duration;
-        hours.push(rw);     
-        // Массив hours содержит данные о продолжительности праката различных профилей в течение часа
-
-        return hours;
     },
 
     getFromStartYear: async function(stan, pool) {

@@ -2,53 +2,53 @@
   "s350": [
     {
       "Hour": 0,
-      "Percent": 102,
-      "Weight": 0
+      "Percent": 112,
+      "Weight": 106
     },
     {
       "Hour": 1,
-      "Percent": 103,
-      "Weight": 0
+      "Percent": 112,
+      "Weight": 106
     },
     {
       "Hour": 2,
-      "Percent": 113,
-      "Weight": 0
+      "Percent": 87,
+      "Weight": 83
     },
     {
       "Hour": 3,
-      "Percent": 101,
-      "Weight": 0
+      "Percent": 100,
+      "Weight": 95
     },
     {
       "Hour": 4,
-      "Percent": 106,
-      "Weight": 0
+      "Percent": 112,
+      "Weight": 106
     },
     {
       "Hour": 5,
       "Percent": 100,
-      "Weight": 0
+      "Weight": 95
     },
     {
       "Hour": 6,
-      "Percent": 24,
-      "Weight": 0
+      "Percent": 107,
+      "Weight": 102
     },
     {
       "Hour": 7,
-      "Percent": 95,
-      "Weight": 0
+      "Percent": 103,
+      "Weight": 98
     },
     {
       "Hour": 8,
-      "Percent": 121,
-      "Weight": 78
+      "Percent": 113,
+      "Weight": 107
     },
     {
       "Hour": 9,
       "Percent": 91,
-      "Weight": 38
+      "Weight": 0
     },
     {
       "Hour": 10,
@@ -62,27 +62,27 @@
     },
     {
       "Hour": 12,
-      "Percent": 100,
-      "Weight": 0
+      "Percent": 104,
+      "Weight": 99
     },
     {
       "Hour": 13,
-      "Percent": 100,
-      "Weight": 0
+      "Percent": 108,
+      "Weight": 103
     },
     {
       "Hour": 14,
-      "Percent": 100,
-      "Weight": 0
+      "Percent": 435,
+      "Weight": 95
     },
     {
       "Hour": 15,
-      "Percent": 100,
-      "Weight": 0
+      "Percent": 14,
+      "Weight": 11
     },
     {
       "Hour": 16,
-      "Percent": 106,
+      "Percent": 2,
       "Weight": 0
     },
     {
@@ -97,69 +97,69 @@
     },
     {
       "Hour": 19,
-      "Percent": 107,
-      "Weight": 0
+      "Percent": 45,
+      "Weight": 26
     },
     {
       "Hour": 20,
-      "Percent": 111,
-      "Weight": 0
+      "Percent": 98,
+      "Weight": 66
     },
     {
       "Hour": 21,
-      "Percent": 107,
-      "Weight": 0
+      "Percent": 112,
+      "Weight": 106
     },
     {
       "Hour": 22,
-      "Percent": 63,
-      "Weight": 0
+      "Percent": 109,
+      "Weight": 104
     },
     {
       "Hour": 23,
-      "Percent": 106,
-      "Weight": 0
+      "Percent": 112,
+      "Weight": 106
     }
   ],
   "s210": [
     {
       "Hour": 0,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 1,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 2,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 3,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 4,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 5,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 6,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 7,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
@@ -174,42 +174,42 @@
     },
     {
       "Hour": 10,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 11,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 12,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 13,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 14,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 15,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 16,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 17,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
@@ -219,27 +219,27 @@
     },
     {
       "Hour": 19,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 20,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 21,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 22,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     },
     {
       "Hour": 23,
-      "Percent": 100,
+      "Percent": 0,
       "Weight": 0
     }
   ]
