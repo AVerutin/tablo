@@ -524,7 +524,7 @@ const Model = {
         const today = new Date();                       // Текущее время
 
         // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
-        if ( (Number(today) - Number(currBrig.BDate) <= 1200000 && !saved) ) {
+        if ( (Number(today) - Number(currBrig.BDate) <= 60000 && !saved) ) {
             // Бригада работает менее минуты и статус не сохранен
             let shift;
             if (today.getHours() == 8) {
@@ -544,6 +544,9 @@ const Model = {
             } else {
                 console.log("Error saving current brigade state.");
             };
+        }
+        if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
+            brigades.setSaved(false);
         }
         return activeBrig;
     },
