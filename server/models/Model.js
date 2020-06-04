@@ -428,7 +428,13 @@ const Model = {
     // Сохранение текущего часа работы бригады
     putHour: async function(stan, hour, percent=0, weight=0, local=false) {
         // 1. Получаем сохраненное ранее состояние бригады
-        var data = await this.readHourlyPercent(stan, local);
+        let data = await this.readHourlyPercent(stan, local); // После очистки почасового плана приходит пустой объект в data, где нет полей 'Percent' и 'Weight'
+
+        if (!(hour in data)) { 
+            // Если в data нет текущего часа, то создаем его
+            data[hour] = {};
+        }
+
         if (isNaN(percent) || isNaN(weight)) {
             data[hour].Percent = 0;
             data[hour].Weight = 0;
@@ -553,7 +559,7 @@ const Model = {
 
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
-        const toLocalStorage = false;
+        const toLocalStorage = true;
         let perc = 0;
         let weight =0;
         const timeShift = {
