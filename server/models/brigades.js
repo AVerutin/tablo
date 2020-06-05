@@ -11,6 +11,14 @@ const Brigades = {
         // saved = true - Все изменения сохранены
         local.set('Saved', saved);
     },
+    
+    setReseted: function(reseted) {
+        local.set('Reseted', reseted);
+    },
+
+    getReseted: function() {
+        return local.get('Reseted');
+    },
 
     isSaved: function() {
         // Возвращает флаг сохранения бригады

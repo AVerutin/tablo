@@ -264,7 +264,7 @@ const Model = {
         result_data.spc_month = result_data.s350.start_month + result_data.s210.start_month;
         result_data.spc_year = result_data.s350.start_year + result_data.s210.start_year;
 
-        // Получение данных о предыдущих бригадах
+        // Получение данных о бригадах (процент выполнения плана и производственные показатели)
         let request = s350.request();
         let statBrigades = await request.query(s350Queries.getPrevBrigades).catch(e => console.log(e));
         for (let stat of statBrigades.recordset) {
@@ -328,15 +328,15 @@ const Model = {
                 // Расчет процента выполнения плана за месяц
                 // Для текущей бригады считаем по своему алгоритму,
                 // Для остальных - берем ранее сохраненные данные
-                brig = await this.getSelectedBrigade(s350, true);
-                let currentData = await this.getDailyPercent(stan);
-                if (!currentData) {
-                    stats.plan_perc[brig.ID] = 0;
-                    stats.dev_shift[brig.ID] = 0;
-                } else {
-                    stats.plan_perc[brig.ID] = currentData.Percent;
-                    stats.dev_shift[brig.ID] = currentData.Weight;                    
-                };
+                // brig = await this.getSelectedBrigade(s350, true);
+                // let currentData = await this.getDailyPercent(stan);
+                // if (!currentData) {
+                //     stats.plan_perc[brig.ID] = 0;
+                //     stats.dev_shift[brig.ID] = 0;
+                // } else {
+                //     stats.plan_perc[brig.ID] = currentData.Percent;
+                //     stats.dev_shift[brig.ID] = currentData.Weight;                    
+                // };
                 //stats.plan_perc[row.brigade] = (plan[row.brigade] === 0) ? 100 : Math.round(row.monthWeight/(plan[row.brigade]*10));
             }
             //console.dir(stats);
@@ -416,6 +416,7 @@ const Model = {
                 res = true;
             }
         }
+        brigades.setReseted(true);
         return res;
     },
     
@@ -589,17 +590,25 @@ const Model = {
             let isSaved = await this.saveShiftStat(prevBrig);
             // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
             if (isSaved) {
+                if (_DEBUG) {
+                    debug.writelog(`getSelectedBrigade() => Состояние бригады: [${isSaved}], запуск процедуры сброса почасового состояния \n`);
+                    
+                }
                 // Обнуляем почасовую статистику
-                let reset = await this.resetHourlyStats(local);
-                if (reset) {
-                    console.log('Hourly stats was been reseted!');
-                };
+                let reseted = brigades.getReseted();
+                if (!reseted) {
+                    let reset = await this.resetHourlyStats(local);
+                    if (reset) {
+                        console.log('Hourly stats was been reseted!');
+                    };
+                }
             } else {
                 console.log("Error saving current brigade state.");
             };
         }
         if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
             brigades.setSaved(false);
+            brigades.setReseted(false);
         }
 
         // Сохраняем производственные показатели текущей бригады
