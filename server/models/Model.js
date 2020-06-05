@@ -4,14 +4,20 @@ const mysql = require('mysql2');
 const config = require('config');
 const store = require('data-store')({ path: process.cwd() + '/delay_plan.json' });
 const hourlyStore = require('data-store')( {path: process.cwd() + '/hourly.json' } );
+const debug = require("./debug_log");
+
+const _DEBUG = true;
+const toLocal = false;
 
 let s350Queries = {
+    getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] WHERE [ID] NOT IN \n" +
+        "(SELECT [ID] FROM [L2Mill].[dbo].[Brigada] WHERE [BCur] = 1)",
     updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = @percent210, [BWeight210] = @weight210, " + 
         "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
-    getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly350] ORDER BY [Hour];",
     resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = 100, [Weight] = 0;",
-    tmpQuery: "SELECT\n" +
+    getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly350] ORDER BY [Hour];",
+    prodList: "SELECT\n" +
         "[AllPack].[Size],\n" +
         "[AllPack].[Length],\n" +
         "[AllPack].[Weight],\n" +
@@ -21,7 +27,7 @@ let s350Queries = {
         "ORDER BY [AllPack].[DataWeight] ASC;",
     planProd: "SELECT * FROM [L2Mill].[dbo].[Dev_Plan_350_Profiles]",
     brigadeQuery: "SELECT [ID], [BDate] FROM [L2Mill].[dbo].[Brigada] WHERE BCur > 0",
-    allBrigades: "SELECT * FROM [L2Mill].[dbo].[Brigada] ORDER BY [ID]",
+    // allBrigades: "SELECT * FROM [L2Mill].[dbo].[Brigada] ORDER BY [ID]",
     // Получаем список всех остановок стана 350
     delayQuery: "SELECT [DELAY_DATETIME] as start\n" +
         "      ,[FINISH_DELAY_DATETIME] as finish\n" +
@@ -33,42 +39,42 @@ let s350Queries = {
         "WHERE [DataWeight] >= @startPeriod;",
     // Получение почасового проката за выбранный период
     // в разрезе Профмля и Длины с почасовым планом проката
-    hourlyProduction: "CREATE TABLE #tplan (\n" +
-        "[ID] [numeric](9, 0) IDENTITY(1,1) NOT NULL,\n" +
-        "[Size] [nvarchar](10) NULL,\n" +
-        "[Length] [nvarchar](10) NULL,\n" +
-        "[Weight] [numeric](12, 0) NULL,\n" +
-        "[Long_Hour] [numeric](4, 0) NULL,\n" +
-        "[Middle_Hour] [numeric](4, 0) NULL,\n" +
-        "[Short_Hour] [numeric](4, 0) NULL,\n" +
-        "[DataWeight] [datetime] NULL\n" +
-        ");\n" +
-        "INSERT INTO #tplan ([Size], [Length], [Weight], [LONG_HOUR], [MIDDLE_HOUR], [SHORT_HOUR], [DataWeight])\n" +
-        "SELECT\n" +
-            "[Size],\n" +
-            "[Length],\n" +
-            "[Weight],\n" +
-            "[LONG_HOUR],\n"+
-            "[MIDDLE_HOUR],\n" +
-            "[SHORT_HOUR],\n" +
-            "[DataWeight]\n" +
-        "FROM [L2Mill].[dbo].[AllPack] LEFT JOIN [L2Mill].[dbo].[Dev_Plan_350_Profiles] ON [L2Mill].[dbo].[AllPack].[Size] = [L2Mill].[dbo].[Dev_Plan_350_Profiles].[PROFILE]\n" +
-        "WHERE [DataWeight] BETWEEN @startTs AND @finishTs\n" +
-        "ORDER BY [DataWeight] DESC;\n" +
-        "SELECT\n" +
-            "[Size],\n" +
-            "[Length],\n" +
-            "SUM([Weight]) AS [Weight],\n" +
-            "MAX([LONG_HOUR]) AS [Plan_Long],\n" +
-            "MAX([MIDDLE_HOUR]) AS [Plan_Midd],\n" +
-            "MAX([SHORT_HOUR]) AS [Plan_Short],\n" +
-            "MIN([DataWeight]) AS [StartTS],\n" +
-            "MAX([DataWeight]) AS [FinishTS],\n" +
-            "MAX([DataWeight]) - MIN([DataWeight]) AS [LengthTS],\n" +
-            "DATEPART(HOUR, [DataWeight]) AS [Hour]\n" +
-        "FROM #tplan\n" +
-        "GROUP BY [Size], [Length], (DATEPART(HOUR, [DataWeight]))\n" +
-        "ORDER BY [StartTS];\n",
+    // hourlyProduction: "CREATE TABLE #tplan (\n" +
+    //     "[ID] [numeric](9, 0) IDENTITY(1,1) NOT NULL,\n" +
+    //     "[Size] [nvarchar](10) NULL,\n" +
+    //     "[Length] [nvarchar](10) NULL,\n" +
+    //     "[Weight] [numeric](12, 0) NULL,\n" +
+    //     "[Long_Hour] [numeric](4, 0) NULL,\n" +
+    //     "[Middle_Hour] [numeric](4, 0) NULL,\n" +
+    //     "[Short_Hour] [numeric](4, 0) NULL,\n" +
+    //     "[DataWeight] [datetime] NULL\n" +
+    //     ");\n" +
+    //     "INSERT INTO #tplan ([Size], [Length], [Weight], [LONG_HOUR], [MIDDLE_HOUR], [SHORT_HOUR], [DataWeight])\n" +
+    //     "SELECT\n" +
+    //         "[Size],\n" +
+    //         "[Length],\n" +
+    //         "[Weight],\n" +
+    //         "[LONG_HOUR],\n"+
+    //         "[MIDDLE_HOUR],\n" +
+    //         "[SHORT_HOUR],\n" +
+    //         "[DataWeight]\n" +
+    //     "FROM [L2Mill].[dbo].[AllPack] LEFT JOIN [L2Mill].[dbo].[Dev_Plan_350_Profiles] ON [L2Mill].[dbo].[AllPack].[Size] = [L2Mill].[dbo].[Dev_Plan_350_Profiles].[PROFILE]\n" +
+    //     "WHERE [DataWeight] BETWEEN @startTs AND @finishTs\n" +
+    //     "ORDER BY [DataWeight] DESC;\n" +
+    //     "SELECT\n" +
+    //         "[Size],\n" +
+    //         "[Length],\n" +
+    //         "SUM([Weight]) AS [Weight],\n" +
+    //         "MAX([LONG_HOUR]) AS [Plan_Long],\n" +
+    //         "MAX([MIDDLE_HOUR]) AS [Plan_Midd],\n" +
+    //         "MAX([SHORT_HOUR]) AS [Plan_Short],\n" +
+    //         "MIN([DataWeight]) AS [StartTS],\n" +
+    //         "MAX([DataWeight]) AS [FinishTS],\n" +
+    //         "MAX([DataWeight]) - MIN([DataWeight]) AS [LengthTS],\n" +
+    //         "DATEPART(HOUR, [DataWeight]) AS [Hour]\n" +
+    //     "FROM #tplan\n" +
+    //     "GROUP BY [Size], [Length], (DATEPART(HOUR, [DataWeight]))\n" +
+    //     "ORDER BY [StartTS];\n",
     statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
         "INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
         "\n" +
@@ -139,10 +145,10 @@ let s350Queries = {
         "        GROUP BY [BRIGADE]) AS LAST_MONTH ON LAST_SHIFT.BRIGADE = LAST_MONTH.BRIGADE\n" +
         "ORDER BY brigade DESC;\n",
     // Получаем текущую остановку стана 350
-    getHourlyDelays: "SELECT [DELAY_STATE], [DELAY_DATETIME] as 'start', [FINISH_DELAY_DATETIME] as 'finish',\n" +
-        "[FINISH_DELAY_DATETIME] - [DELAY_DATETIME] as 'len', DATEPART(HOUR, [DELAY_DATETIME]) AS [Hour]\n" +
-        "FROM [L2Mill].[dbo].[L2_DELAY_HALTLFM1]\n" +
-        "WHERE [DELAY_DATETIME] > @startTs AND [FINISH_DELAY_DATETIME] < @finishTs;\n",
+    // getHourlyDelays: "SELECT [DELAY_STATE], [DELAY_DATETIME] as 'start', [FINISH_DELAY_DATETIME] as 'finish',\n" +
+    //     "[FINISH_DELAY_DATETIME] - [DELAY_DATETIME] as 'len', DATEPART(HOUR, [DELAY_DATETIME]) AS [Hour]\n" +
+    //     "FROM [L2Mill].[dbo].[L2_DELAY_HALTLFM1]\n" +
+    //     "WHERE [DELAY_DATETIME] > @startTs AND [FINISH_DELAY_DATETIME] < @finishTs;\n",
     getCurDelay: "SELECT TOP (1) [DELAY_DATETIME] AS delayStart\n" +
         "FROM [L2Mill].[dbo].[L2_DELAY_HALTLFM1]\n" +
         "WHERE [FINISH_DELAY_DATETIME] IS NULL\n" +
@@ -174,6 +180,15 @@ let s210Queries = {
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
     getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly210] ORDER BY [Hour];",
     resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = 100, [Weight] = 0;",
+    prodList: "SELECT [RML_SEMIPRODUCT].[SEMIPRODUCT_WGT] AS [Weight], [RML_SEMIPRODUCT].[ROLLING_DATE] AS [Rolling_Date], " +
+        "[RML_PRODUCT_TYPE].[PROFILE_ID] AS [Profile_ID], [RML_PRODUCT_TYPE].[PRODUCT_TYPE_HIPROF] AS [Profile_Name] FROM [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT], " +
+        "[ABINSK_RMRT].[dbo].[RML_PROGRAM], [ABINSK_RMRT].[dbo].[RML_JOB], [ABINSK_RMRT].[dbo].[RML_CATALOG], [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE] " +
+        "WHERE [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[PROGRAM_ID] = [ABINSK_RMRT].[dbo].[RML_PROGRAM].[PROGRAM_ID] AND " +
+        "[ABINSK_RMRT].[dbo].[RML_PROGRAM].[JOB_ID] = [ABINSK_RMRT].[dbo].[RML_JOB].[JOB_ID] AND " +
+        "[ABINSK_RMRT].[dbo].[RML_JOB].[CATALOG_ID] = [ABINSK_RMRT].[dbo].[RML_CATALOG].[CATALOG_ID] AND " +
+        "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND " +
+        "[ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] BETWEEN @startTs AND @finishTs " +
+        "ORDER BY [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] ASC;",
     delayQuery: "SELECT [START_DELAY] as start\n" +
         ",[END_DELAY] as finish\n" +
         "\n" +
@@ -220,7 +235,7 @@ let s210Queries = {
         "WHERE [STOP_STATUS] = 1\n" +
         "ORDER BY [START_DELAY] DESC",
     prodPeriod: "SELECT SUM(SEMIPRODUCT_WGT) AS 'Weigth'\n"+
-        "FROM [RML_SEMIPRODUCT]\n" +
+        "FROM [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT]\n" +
         "WHERE [ROLLING_DATE] >= @startPeriod\n",
 }
 let espcQueries = {
@@ -235,17 +250,26 @@ const Model = {
 
     getData: async function(){
         let result_data = {
-            's350': await this.getStats("s350", s350, s350Queries),
-            's210': await this.getStats("s210", s210, s210Queries),
-            shift_start: await this.getShiftStart(),
-            temp_in: await this.getSPCTemperature(),
-            temp_out: await this.getTemperature(),
-            current_brigade: await this.getSelectedBrigade(s350), /* brigades.getActiveBrigade(s350), */
-            spc_month: 0,
-            spc_year: 0,
+            's350': await this.getStats("s350", s350, s350Queries), // Статистика по стану 350
+            's210': await this.getStats("s210", s210, s210Queries), // Статистика по стану 210
+            shift_start: await this.getShiftStart(), // Получение времени начала смены текущей бригады   
+            temp_in: await this.getSPCTemperature(), // Температура воздуха в цеху
+            temp_out: await this.getTemperature(), // Температура воздуха на улице
+            current_brigade: await this.getSelectedBrigade(s350, toLocal), // Получение номера активной (выбранной на табло) бригады
+            spc_month: 0, // Прокатано по цеху с начала месяца
+            spc_year: 0,  // Прокататно по цеху с начала года
         };
+        // Расчет показателей в целом по цеху
         result_data.spc_month = result_data.s350.start_month + result_data.s210.start_month;
         result_data.spc_year = result_data.s350.start_year + result_data.s210.start_year;
+
+        // Получение данных о предыдущих бригадах
+        // let request = s350.request();
+        // let prevBrigades = await request.query(s350Queries.getPrevBrigades).catch(e => console.log(e));
+        // for (let prev of prevBrigades.recordset) {
+        //     // result_data.s350.
+        // }
+
         return result_data;
     },
     getStats: async function(stan, pool, queries) {
@@ -253,9 +277,9 @@ const Model = {
         try {
             let request = pool.request();
             const today = new Date();
-            const monthBegin = new Date(today.getFullYear(), today.getMonth() , 1, -4, 0, 0);
+            const monthBegin = new Date(today.getFullYear(), today.getMonth() , 1, -4, 0, 0); // 20 часов последнего дня предыдущего месяца
             request.input("monthBegin", sql.DateTime, monthBegin);
-            let result = await request.query(queries.statsQuery).catch(e =>console.log(e));
+            let result = await request.query(queries.statsQuery).catch(e =>console.log(e)); // Сбор полной статистики по стану
             // let plan = await this.getPlanProd(stan, monthBegin, today);
             //result.recordsets.forEach(r => console.log(r));
             let stats =  {
@@ -269,10 +293,13 @@ const Model = {
                 start_year: 0,
             };
 
-            // fromYear = await this.getFromStartYear(stan, pool, stats);
-            stats.start_year = Math.round(await this.getFromStartYear(stan, pool) / 1000.0);
-            stats.start_month = Math.round(await this.getFromStartMonth(stan, pool) / 1000.0);
-            let resultCurDelay = await request.query(queries.getCurDelay);
+            // Получение данных о производственых показателях предыдущих бригад
+            
+            stats.start_year = Math.round(await this.getFromStartYear(stan, pool) / 1000.0); // Получение показателей по станам с начала года
+            stats.start_month = Math.round(await this.getFromStartMonth(stan, pool) / 1000.0); // Получение показателей по станам с начала месяца
+            let resultCurDelay = await request.query(queries.getCurDelay); // Получение данных о текущей остановке стана
+            
+            // Расчет по текущей остановке стана
             let oldValues = this.getDelayPlan(stan) || { working: false, delay_planned_time: 0};
             if (resultCurDelay.recordset.length > 0) {
                 stats.working = false;
@@ -291,12 +318,13 @@ const Model = {
             // brig = await this.getSelectedBrigade()
             // stats.plan_perc[brig] = currentPrecent;
 
+            // Заполнение данных по каждому стану
             for(let row of result.recordset) {
                 await this._fillStats(pool, queries.delayQuery, row, stats);
                 // Расчет процента выполнения плана за месяц
                 // Для текущей бригады считаем по своему алгоритму,
                 // Для остальных - берем ранее сохраненные данные
-                brig = await this.getSelectedBrigade(s350);
+                brig = await this.getSelectedBrigade(s350, true);
                 let currentData = await this.getDailyPercent(stan);
                 if (!currentData) {
                     stats.plan_perc[brig.ID] = 0;
@@ -364,23 +392,28 @@ const Model = {
         let res = false;
         if (local) {
             // Локальное хранилшище
-                hourlyStore.set('s350', {});
-                hourlyStore.set('s210', {});
-                res = true;
-            } else {
-            // База данных
-                let request = s350.request();
-                let query = await request.query(s350Queries.resetHourStats).catch(e => console.log(e));
-                if (query.rowsAffected[0] > 0) {
-                    res = true;
-                }
-                query = await request.query(s210Queries.resetHourStats).catch(e => console.log(e));
-                if (query.rowsAffected[0] > 0) {
-                    res = true;
-                }
+            let dat = {};
+            let hr = {'Percent': 100, 'Weight': 0}
+            for (let i=0; i<24; ++i) {
+                dat[i] = hr;
             }
-            return res;
-        },
+            hourlyStore.set('s350', dat);
+            hourlyStore.set('s210', dat);
+            res = true;
+        } else {
+        // База данных
+            let request = s350.request();
+            let query = await request.query(s350Queries.resetHourStats).catch(e => console.log(e));
+            if (query.rowsAffected[0] > 0) {
+                res = true;
+            }
+            query = await request.query(s210Queries.resetHourStats).catch(e => console.log(e));
+            if (query.rowsAffected[0] > 0) {
+                res = true;
+            }
+        }
+        return res;
+    },
     
 
     // Сохранение подготовленного состояния по всем часам работы бригады
@@ -394,7 +427,18 @@ const Model = {
             request.input('hourPercent', data[hour].Percent);   //  /* Процент выполнения текущего часа */
             request.input('hourWeight', data[hour].Weight);     //  /* Сумма взвешенных пакетов за текущий час */
             request.input('currentHour', hour);                 //  /* Текущий час */
-            await request.query(s350Queries.setHourStats).catch(e => console.log(e));
+            // if (_DEBUG) debug.writelog(`saveHourlyPercent (СТАН: [${stan}], ЧАС: [${hour}], ПРОЦЕНТ: [${data[hour].Percent}], ВЕС: [${data[hour].Weight}])`);
+            
+            switch (stan) {
+                case 's350' : {
+                    await request.query(s350Queries.setHourStats).catch(e => console.log(e));
+                    break;
+                }
+                case 's210' : {
+                    await request.query(s210Queries.setHourStats).catch(e => console.log(e));
+                    break;
+                }
+            }
         }
     },
 
@@ -445,6 +489,7 @@ const Model = {
         };
         // Записываем состояние по часам в локальное хранилище
         await this.saveHourlyPercent(stan, data, local, hour);
+        // if (_DEBUG) debug.writelog(`Стан: ${stan}, час: ${hour}, процент: ${percent}, вес: ${weight}`);
     },
 
     // Получение времени начала смены текущей бригады
@@ -484,6 +529,7 @@ const Model = {
 
     // Сохранение состояния текущей бригады
     saveShiftStat: async function(currBrigada) {
+        let now = this.dateToString(new Date());
         let perc350 = 0;
         let perc210 = 0;
         let weig350 = 0;
@@ -498,7 +544,6 @@ const Model = {
             perc210 = data210.Percent;
             weig210 = data210.Weight;
         }
-
         // Сохраняем процент выполнения и массу проката для стана 350 за смену
         // Если нет данных о станах, 100% выполнение и 0 тонн
         let request = s350.request();
@@ -507,6 +552,7 @@ const Model = {
         request.input('percent210', perc210);
         request.input('weight210', weig210);
         request.input('currBrigada', currBrigada);
+        if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
         let result = await request.query(s350Queries.updateBStats).catch(e => {return false}); 
         if (result.rowsAffected.length) {
             brigades.setSaved(true);
@@ -516,10 +562,7 @@ const Model = {
 
 
     // Определяем номер бригады, которая должна заступить на смену
-    getSelectedBrigade: async function(pool) {
-    /* TODO: Получить из модуля brigades флаг состояния бригады (сохранено, или нет)
-    Если даные не сохранены и пришло время сменить бригаду, то сохранить данные, сменить бригаду
-    и обнулить данные по часам */
+    getSelectedBrigade: async function(pool, local) {
 
         // Проверяем время
         let currBrig = await brigades.getCurrentBrigade(pool);    // Номер текущей бригады и время начала ее смены
@@ -543,7 +586,7 @@ const Model = {
             // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
             if (isSaved) {
                 // Обнуляем почасовую статистику
-                let reset = await this.resetHourlyStats(false);
+                let reset = await this.resetHourlyStats(local);
                 if (reset) {
                     console.log('Hourly stats was been reseted!');
                 };
@@ -554,28 +597,27 @@ const Model = {
         if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
             brigades.setSaved(false);
         }
+        // if (_DEBUG) debug.writelog(`getSelectedBrigade() =>  Активная бригада: [${activeBrig}], Текущая бригада: [${currBrig.ID}]`);
+        // await this.saveShiftStat(currBrig.ID);
         return activeBrig;
     },
 
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
-        const toLocalStorage = true;
         let perc = 0;
         let weight =0;
         const timeShift = {
-            "Day": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-            "Night": [20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8]
+            "Day": ['8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'],
+            "Night": ['20', '21', '22', '23', '0', '1', '2', '3', '4', '5', '6', '7', '8']
         };
         let curr = [];
 
-        let calc = await this.calcPercent(stan, toLocalStorage); // Заполняем данные по часам
-        if (!calc) {
-            return false;
-        }
+        await this.calcPercent(stan, toLocal); // Заполняем данные по часам
+
         let data = {};
         let currentShift = await brigades.getCurrentBrigade(s350);
-        let shiftStart = currentShift.BDate;
-        shiftStart = shiftStart.getHours();
+        let shiftStart = currentShift.BDate; 
+        shiftStart = shiftStart.getUTCHours();
         if (shiftStart == 8) {
             // Заступила дневная смена, устанавливаем часы дневной смены
             curr = timeShift.Day;
@@ -584,12 +626,12 @@ const Model = {
             curr = timeShift.Night;
         }
 
-        let daily = await this.readHourlyPercent(stan, toLocalStorage);
+        let daily = await this.readHourlyPercent(stan, toLocal);
 
-        for (day of daily) { 
-            if (curr.includes(day.Hour)) {
-                perc += day.Percent;
-                weight += day.Weight;
+        for (day in daily) { 
+            if (curr.includes(day)) {
+                perc += daily[day].Percent;
+                weight += daily[day].Weight;
             }
         }
         perc = Math.round(perc / 12);
@@ -608,19 +650,14 @@ const Model = {
         finish = this.toLocalDate(finish);
         let start = await this.getStartHour(finish);
 
-        /// START DEBUG
-        // start = new Date('2020-06-02 11:00:00');
-        // finish = new Date ('2020-06-02 11:59:59');
-        /// FINISH DEBUG
-
         var hour = finish.getUTCHours(); 
         // Получаем фактически произведенную продукцию за период
-        fact = await this.getHourlyProd(start, finish); // Нет стана 210
+        fact = await this.getHourlyProd(stan, start, finish).catch(e => console.log(e));
         if (!fact) {
             return false;
         }
         // Получаем плановые показатели 
-        plan = await this.getProdPlan(stan);
+        plan = await this.getProdPlan(stan).catch(e => console.log(e));
 
         let avg = 0;
         // TODO: Проход по строкам набора fact, выбор наименования профиля, поиск в таблице плана данный профиль и получение плана
@@ -635,7 +672,7 @@ const Model = {
                 // Проверить на наличие записей (при простое возвращается пустой набор)
                 profile = row.Profile;
                 length = Number(row.Length);
-                real_weight = row.Weight;
+                real_weight = Math.round(row.Weight / 1000); // Пересчитать фактически прокатанное в тонны
                 duration = row.Duration;
 
                 // Ищем план для текущего профиля
@@ -649,7 +686,6 @@ const Model = {
 
                 // Расчитаем, какую часть часа был фактический прокат
                 hourPercent = this.calcHourPart(start, finish);       // сколько процентов в текущем часе работали
-                real_weight = Math.round(real_weight / 1000);         // Пересчитать фактически прокатанное в тонны
                 hourPlan = (plan_weight * hourPercent) / 100;         // Сколько тонн должны были прокатать за это время 
                 perc = (real_weight * 100) / hourPlan;                // При простое деление на 0!
                 avg += perc;
@@ -659,8 +695,50 @@ const Model = {
             avg = Math.round(avg / percent.length);
         } else {
             // Для стана 210
-            // >>>>>>>>>>>>>>>>>>>>>
+            var profileID = '';
+            var profileName = '';
+            var real_weight = 0;
+            var plan_weight = 0;
+            let percent = [];
+            for (row of fact) {
+                profileID = row.ProfileID;          // Наименование (1) профиля из таблицы фактического производства
+                profileName = row.ProfileName;      // Наименование (2) профиля из таблицы фактического производства
+                real_weight = Math.round(row.Weight / 1000); // Пересчитаем вес в тонны
+                duration = row.Duration;
 
+                // Ищем в таблице планового производства Наименование (1)
+                for (let i = 0; i < plan.length; ++i) {
+                    // Ищем по полю fact.ProfileID
+                    if (plan[i].ProfileName == profileID) {
+                        // Нашли
+                        plan_weight = plan[i].Plan;
+                        break;
+                    };
+                };
+                if (plan_weight == 0) {
+                    // Если не нашли по полю fact.ProfileID, ищем по полю fact.ProfileName
+                    for (let i = 0; i < plan.length; ++i) {
+                        if (plan[i].ProfileName == profileName) {
+                            // Нашли
+                            plan_weight = plan[i].Plan;
+                            break;
+                        }
+                    }
+                };
+                if (plan_weight == 0) {
+                    // Нет такого профиля в плане
+                    let now = this.dateToString(new Date());
+                    console.log('%s: Current profile [%s] was not founded in plan table!', now, profileName);
+                    return false;
+                }
+                // Заполнили плановый вес
+                hourPercent = this.calcHourPart(start, finish);       // сколько процентов в текущем часе работали
+                hourPlan = (plan_weight * hourPercent) / 100;         // Сколько тонн должны были прокатать за это время 
+                perc = (real_weight * 100) / hourPlan;                // При простое деление на 0!
+                avg += perc;
+                percent.push(perc);
+            }
+            avg = Math.round(avg / percent.length);
         }
         await this.putHour(stan, hour, avg, real_weight, local);
     },
@@ -727,41 +805,29 @@ const Model = {
         if (withDate) {
             strDate = d.getFullYear();
             strDate += '-';
-
             tmp = d.getMonth()+1;
-            if (tmp < 10) {
-                strDate += '0'
-            }
+            if (tmp < 10) strDate += '0';
             strDate += tmp;
             strDate += '-';
-
             tmp = d.getDate();
-            if (tmp < 10) {
-                strDate += '0';
-            }
+            if (tmp < 10) strDate += '0';
             strDate += tmp;
             strDate += ' ';
-        }
+        };
         tmp = d.getUTCHours();
-        if (tmp < 10) {
-            strDate += '0';
-        }
+        if (tmp < 10) strDate += '0';
         strDate += tmp;
         strDate += ':';
-
         tmp = d.getMinutes();
-        if (tmp < 10) {
-            strDate += '0';
-        }
+        if (tmp < 10) strDate += '0';
         strDate += tmp;
         strDate += ":";
-
         tmp = d.getSeconds();
-        if (tmp < 10) {
-            strDate += '0';
-        }
+        if (tmp < 10) strDate += '0';
         strDate += tmp;
         strDate += '.';
+        if (d.getMilliseconds() < 100) strDate += '0';
+        if (d.getMilliseconds() < 10) strDate += '0';
         strDate += d.getMilliseconds();
 
         return strDate;
@@ -802,7 +868,8 @@ const Model = {
             if (result.recordset.length > 0) {
                 for (row of result.recordset) {
                     r = {}
-                    r['Profile'] = row.PROFILE;    // Наименование профиля
+                    // r['ProfileID'] = row.PROFILE_ID;    // Наименование профиля (1)
+                    r['ProfileName'] = row.PROFILE_NAME;    // Наименование профиля
                     r['Plan'] = row.HOURLY;        // План проката на час
                     Data.push(r);
                 }
@@ -811,7 +878,7 @@ const Model = {
         return Data;
     },
 
-    getProdList: async function(start, finish) {
+    getProdList: async function(stan, start, finish) {
         //FIXME: Нет стана 210
         // TODO: Для каждой строки определить:
         // 1) Время начала проката, 
@@ -824,94 +891,181 @@ const Model = {
         // Расчет проката нескольких профилей в течение одного часа
         // Перебираем созданный ранее по всем профилям массив и выбираем строки, у которых 
         // совпадает значение часа, но различается длина и/или профиль
-
-        let tmp350 = s350.request();
-        tmp350.input("startTS", sql.DateTime, start);
-        tmp350.input("finishTS", sql.DateTime, finish);
-        let tmpResult = await tmp350.query(s350Queries.tmpQuery).catch(e =>console.log(e));
         let prof = [];
-        for (let r=0; r<tmpResult.recordset.length; ++r) {
-            row = {};
-            Data = tmpResult.recordset[r].DataWeight;
-            Profile = tmpResult.recordset[r].Size;
-            Length = tmpResult.recordset[r].Length;
-            Weight = tmpResult.recordset[r].Weight;
-            if (Data < start) break;
+        if (stan == "s350") {
+            let list350 = s350.request();
+            list350.input("startTS", sql.DateTime, start);
+            list350.input("finishTS", sql.DateTime, finish);
+            let listResult = await list350.query(s350Queries.prodList).catch(e =>console.log(e));
+            prof = [];
+            for (let r=0; r<listResult.recordset.length; ++r) {
+                row = {};
+                Data = listResult.recordset[r].DataWeight;
+                Profile = listResult.recordset[r].Size;
+                Length = listResult.recordset[r].Length;
+                Weight = listResult.recordset[r].Weight;
+                if (Data < start) break;
 
-            row['Profile'] = Profile;
-            row['Length'] = Length;
-            row['Weight'] = Weight;
-            row['Data'] = Data;
+                row['Profile'] = Profile;
+                row['Length'] = Length;
+                row['Weight'] = Weight;
+                row['Data'] = Data;
 
-            if (prof.length == 0) {
-                // Расчет времени проката
-                // Если в этом часу больше ничего не катали, то берем сначала часа
-                LengthTs = Number(Data) - Number(start);
-                row['LengthTs'] = LengthTs;
-            } else {
-                LengthTs = Number(Data) - Number(prof[r-1].Data);
-                row['LengthTs'] = LengthTs;
+                if (prof.length == 0) {
+                    // Расчет времени проката
+                    // Если в этом часу больше ничего не катали, то берем сначала часа
+                    LengthTs = Number(Data) - Number(start);
+                    row['LengthTs'] = LengthTs;
+                } else {
+                    LengthTs = Number(Data) - Number(prof[r-1].Data);
+                    row['LengthTs'] = LengthTs;
+                };
+                prof.push(row); // Массив prof содержит все взвешенные пакеты за текущий час
             };
-            prof.push(row); // Массив prof содержит все взвешенные пакеты за текущий час
-        };
+        } else { 
+            let list210 = s210.request();
+            list210.input("startTS", sql.DateTime, start);
+            list210.input("finishTS", sql.DateTime, finish);
+            let listResult = await list210.query(s210Queries.prodList).catch(e =>console.log(e));
+            prof = [];
+            for (let r=0; r<listResult.recordset.length; ++r) {
+                row = {};
+                Data = listResult.recordset[r].Rolling_Date;
+                ProfileID = listResult.recordset[r].Profile_ID;
+                ProfileName = listResult.recordset[r].Profile_Name;
+                Weight = listResult.recordset[r].Weight;
+                if (Data < start) break;
+
+                row['ProfileID'] = ProfileID;
+                row['ProfileName'] = ProfileName;
+                row['Weight'] = Weight;
+                row['Data'] = Data;
+
+                if (prof.length == 0) {
+                    // Расчет времени проката
+                    // Если в этом часу больше ничего не катали, то берем сначала часа
+                    LengthTs = Number(Data) - Number(start);
+                    row['LengthTs'] = LengthTs;
+                } else {
+                    LengthTs = Number(Data) - Number(prof[r-1].Data);
+                    row['LengthTs'] = LengthTs;
+                };
+                prof.push(row); // Массив prof содержит все взвешенные пакеты за текущий час
+            };
+        }
         return prof;
     },
 
-    getHourlyProd: async function(start, finish) {
-        // Нет стана 210
-        const prof = await this.getProdList(start, finish);
-        if (prof.length > 0) {
-            // Ручной расчет проката всех профилей 
-            let weight = 0;
-            let duration = 0;
-            let profile = 0;
-            let length = 0;
-            let hour = '';
-            let hours = [];
-            let rw = {};
-            len = prof.length;
-            // Рассчитываем время фактического проката профиля в течение часа
-            // FIXME: Проверить работу при попадании немеры - длина пореза ND
-            for (let w=0; w<len; ++w) {
-                if (profile == 0 && length == 0) {
-                    // Первый прокат в этом часе
-                    profile = prof[w].Profile;
-                    length = prof[w].Length;
-                    weight = prof[w].Weight;
-                    duration = prof[w].LengthTs;
-                    hour = start.getUTCHours().toString();
-                } else {
-                    // Доугой профиль и/ил длина пореза
-                    if (profile != prof[w].Profile || length != prof[w].Length) {
-                        rw = {};
-                        rw['Hour'] = hour;
-                        rw['Profile'] = profile;
-                        rw['Length'] = length;
-                        rw['Weight'] = weight;
-                        rw['Duration'] = duration;
-                        hours.push(rw);
+    getHourlyProd: async function(stan, start, finish) {
+        // Для стана 350
+        if (stan == 's350') {
+            const prof = await this.getProdList(stan, start, finish);
+            let len = prof.length;
+            if (len > 0) {
+                // Ручной расчет проката всех профилей 
+                let weight = 0;
+                let duration = 0;
+                let profile = 0;
+                let length = 0;
+                let hour = '';
+                let hours = [];
+                let rw = {};
+                // Рассчитываем время фактического проката профиля в течение часа
+                // FIXME: Проверить работу при попадании немеры - длина пореза ND
+                for (let w=0; w<len; ++w) {
+                    if (profile == 0 && length == 0) {
+                        // Первый прокат в этом часе
                         profile = prof[w].Profile;
                         length = prof[w].Length;
-                        weight = 0;
-                        duration = 0;
+                        weight = prof[w].Weight;
+                        duration = prof[w].LengthTs;
+                        hour = start.getUTCHours().toString();
                     } else {
-                        weight += prof[w].Weight;
-                        duration += Number(prof[w].LengthTs);
+                        // Доугой профиль и/ил длина пореза
+                        if (profile != prof[w].Profile || length != prof[w].Length) {
+                            rw = {};
+                            rw['Hour'] = hour;
+                            rw['Profile'] = profile;
+                            rw['Length'] = length;
+                            rw['Weight'] = weight;
+                            rw['Duration'] = duration;
+                            hours.push(rw);
+                            profile = prof[w].Profile;
+                            length = prof[w].Length;
+                            weight = 0;
+                            duration = 0;
+                        } else {
+                            weight += prof[w].Weight;
+                            duration += Number(prof[w].LengthTs);
+                        }
                     }
                 }
+                rw = {};
+                rw['Hour'] = hour;
+                rw['Profile'] = profile;
+                rw['Length'] = length;
+                rw['Weight'] = weight;
+                rw['Duration'] = duration;
+                hours.push(rw);     
+                // Массив hours содержит данные о продолжительности праката различных профилей в течение часа
+                // Если hours путой - вернуть false
+                return hours;
+            } else {
+                return false;
             }
-            rw = {};
-            rw['Hour'] = hour;
-            rw['Profile'] = profile;
-            rw['Length'] = length;
-            rw['Weight'] = weight;
-            rw['Duration'] = duration;
-            hours.push(rw);     
-            // Массив hours содержит данные о продолжительности праката различных профилей в течение часа
-            // Если hours путой - вернуть false
-            return hours;
         } else {
-            return false;
+            // Для стана 210
+            const prof = await this.getProdList(stan, start, finish);
+            let len = prof.length;
+            if (len > 0) {
+                let weight = 0;
+                let duration = 0;
+                let profileID = '';
+                let profileName = '';
+                let hour = '';
+                let hours = [];
+                let rw = {};
+                for (row of prof) {
+                    if (profileID == 0 && profileName == 0) {
+                        // Первый прокат в этом часе
+                        profileID = row.ProfileID;
+                        profileName = row.ProfileName;
+                        weight = row.Weight;
+                        duration = row.LengthTs;
+                        hour = start.getUTCHours().toString();
+                    } else {
+                        // Доугой профиль и/ил длина пореза
+                        if (profileID != row.ProfileID || profileName != row.ProfileName) {
+                            rw = {};
+                            rw['Hour'] = hour;
+                            rw['ProfileID'] = profileID;
+                            rw['ProfileName'] = profileName;
+                            rw['Weight'] = weight;
+                            rw['Duration'] = duration;
+                            hours.push(rw);
+                            profileID = row.ProfileID;
+                            profileName = row.ProfileName;
+                            weight = 0;
+                            duration = 0;
+                        } else {
+                            weight += row.Weight;
+                            duration += Number(row.LengthTs);
+                        }
+                    }
+                }
+                rw = {};
+                rw['Hour'] = hour;
+                rw['ProfileID'] = profileID;
+                rw['ProfileName'] = profileName;
+                rw['Weight'] = weight;
+                rw['Duration'] = duration;
+                hours.push(rw);     
+                // Массив hours содержит данные о продолжительности праката различных профилей в течение часа
+                // Если hours путой - вернуть false
+                return hours;
+            } else {
+                return false;
+            }
         }
     },
 
