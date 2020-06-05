@@ -10,8 +10,9 @@ const _DEBUG = true;
 const toLocal = false;
 
 let s350Queries = {
-    getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] WHERE [ID] NOT IN \n" +
-        "(SELECT [ID] FROM [L2Mill].[dbo].[Brigada] WHERE [BCur] = 1)",
+    // getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] WHERE [ID] NOT IN \n" +
+    //     "(SELECT [ID] FROM [L2Mill].[dbo].[Brigada] WHERE [BCur] = 1)",
+    getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
     updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = @percent210, [BWeight210] = @weight210, " + 
         "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
@@ -264,11 +265,14 @@ const Model = {
         result_data.spc_year = result_data.s350.start_year + result_data.s210.start_year;
 
         // Получение данных о предыдущих бригадах
-        // let request = s350.request();
-        // let prevBrigades = await request.query(s350Queries.getPrevBrigades).catch(e => console.log(e));
-        // for (let prev of prevBrigades.recordset) {
-        //     // result_data.s350.
-        // }
+        let request = s350.request();
+        let statBrigades = await request.query(s350Queries.getPrevBrigades).catch(e => console.log(e));
+        for (let stat of statBrigades.recordset) {
+            result_data.s350.dev_shift[stat.ID] = stat.BWeight350;
+            result_data.s210.dev_shift[stat.ID] = stat.BWeight210;
+            result_data.s350.plan_perc[stat.ID] = stat.BPercent350;
+            result_data.s210.plan_perc[stat.ID] = stat.BPercent210;
+        }
 
         return result_data;
     },
@@ -529,7 +533,7 @@ const Model = {
 
     // Сохранение состояния текущей бригады
     saveShiftStat: async function(currBrigada) {
-        let now = this.dateToString(new Date());
+        // let now = this.dateToString(new Date());
         let perc350 = 0;
         let perc210 = 0;
         let weig350 = 0;
@@ -552,7 +556,7 @@ const Model = {
         request.input('percent210', perc210);
         request.input('weight210', weig210);
         request.input('currBrigada', currBrigada);
-        if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
+        // if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
         let result = await request.query(s350Queries.updateBStats).catch(e => {return false}); 
         if (result.rowsAffected.length) {
             brigades.setSaved(true);
@@ -597,8 +601,10 @@ const Model = {
         if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
             brigades.setSaved(false);
         }
+
+        // Сохраняем производственные показатели текущей бригады
         // if (_DEBUG) debug.writelog(`getSelectedBrigade() =>  Активная бригада: [${activeBrig}], Текущая бригада: [${currBrig.ID}]`);
-        // await this.saveShiftStat(currBrig.ID);
+        await this.saveShiftStat(currBrig.ID);
         return activeBrig;
     },
 
@@ -727,8 +733,8 @@ const Model = {
                 };
                 if (plan_weight == 0) {
                     // Нет такого профиля в плане
-                    let now = this.dateToString(new Date());
-                    console.log('%s: Current profile [%s] was not founded in plan table!', now, profileName);
+                    // let now = this.dateToString(new Date());
+                    // console.log('%s: Current profile [%s] was not founded in plan table!', now, profileName);
                     return false;
                 }
                 // Заполнили плановый вес
