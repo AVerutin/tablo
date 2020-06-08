@@ -1,10 +1,10 @@
 {
   "s350": {
     "working": true,
-    "delay_planned_time": 2400000
+    "delay_planned_time": 1800000
   },
   "s210": {
     "working": true,
-    "delay_planned_time": 4500000
+    "delay_planned_time": 2700000
   }
 }

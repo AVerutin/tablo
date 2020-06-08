@@ -397,6 +397,9 @@
                     this.s350.delay_planned_time = response.data.s350.delay_planned_time;
                     this.s350.delay_planned_input = this.formatDate(new Date(response.data.s350.delay_planned_time), {utc: true, showDate: false, showSeconds:  false});
                 });
+                // Обнуление значения планового простоя после его завершения
+                // s350.delay_planned_input = 0;
+                // s210.delay_planned_input = 0;
             },
             async login(e) {
                 e.preventDefault();

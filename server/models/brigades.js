@@ -48,6 +48,7 @@ const Brigades = {
         const today = new Date();
         const currHour = today.getHours();
         const currMinutes = today.getMinutes();
+        const currSeconds = today.getSeconds();
 
         if ( (currHour == 8) || (currHour == 20) ) { // Определение часа смены бригады
             if (currMinutes <= 1) {                  // Определение минуты смены бригады  
@@ -63,10 +64,25 @@ const Brigades = {
                     // Установить флаг необходимости сохранения состояния и вернуть в вызывающий метод
                     this.setActiveBrigade(nextBrig, true);
                     brig = nextBrig;
+
+                    // Добавить обнуление результатов активной бригады сразу после начала ее смены (% выполнения за день и производство с начала смены)
+                    if (currSeconds <= 20) {
+                        this.resetActiveBrigade(pool, brig);
+                    }
                 }
             }
         }
         return brig;
+    },
+
+    resetActiveBrigade: async function(pool, brig) {
+        // Сброс производственных показателей активной бригады в начале рабочей смены
+        let request = pool.request();
+        const sqlQuery = "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = 0, [BWeight210] = 0, [BPercent350] = 0, " +
+            "[BWeight350] = 0 WHERE [ID] = @currBrig;";
+        request.input('currBrig', brig);
+        await request.query(sqlQuery).catch(e => console.log(e));
+
     },
 
     getCurrentBrigade: async function(pool) {

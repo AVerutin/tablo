@@ -12,7 +12,7 @@ const toLocal = false;
 let s350Queries = {
     // getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] WHERE [ID] NOT IN \n" +
     //     "(SELECT [ID] FROM [L2Mill].[dbo].[Brigada] WHERE [BCur] = 1)",
-    getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
+    getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
     updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = @percent210, [BWeight210] = @weight210, " + 
         "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
@@ -76,80 +76,114 @@ let s350Queries = {
     //     "FROM #tplan\n" +
     //     "GROUP BY [Size], [Length], (DATEPART(HOUR, [DataWeight]))\n" +
     //     "ORDER BY [StartTS];\n",
-    statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
-        "INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
-        "\n" +
-        "CREATE TABLE #billets (\n" +
-        "    [ID] INT IDENTITY,\n" +
-        "    [SHIFT] [numeric](9, 0) NULL,\n" +
-        "    [BRIGADE] [numeric](9, 0) NULL,\n" +
-        "    [CURRENT] [numeric](9, 0) NULL,\n" +
-        "    [BRIGADE_START] [datetime] NULL,\n" +
-        "    [COUNT] [numeric](9) NULL,\n" +
-        "    [COUNTGB] [numeric](9) NULL,\n" +
-        "    [BILLETWEIGHT] [numeric](9) NULL,\n" +
-        ")\n" +
-        "\n" +
-        "insert into #billets ([SHIFT], [BRIGADE], [CURRENT], [BRIGADE_START], [COUNT], [COUNTGB], [BILLETWEIGHT])\n" +
-        "SELECT\n" +
-        "    DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12 as [SHIFT],\n" +
-        "    MAX(brigade) as [BRIGADE],\n" +
-        "    0,\n" +
-        "    '',\n" +
-        "    SUM(CASE EVENT WHEN 0 THEN 1 ELSE 0 END) as [COUNT],\n" +
-        "    SUM(CASE EVENT WHEN -10 THEN 1 WHEN -11 THEN 1 ELSE 0 END) as [COUNTGB],\n" +
-        "    SUM(CASE EVENT WHEN 0 THEN [BILLET_WEIGHT] ELSE 0 END) as [BILLETWEIGHT]\n" +
-        "FROM [L2Mill].[dbo].[L2_PO_BILLET]\n" +
-        "    LEFT JOIN #sheldule ON id_sheldule = (DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12) % 8 + 1\n" +
-        "WHERE [DATE_RECORD] > '2020-04-30 20:00:00'\n" +
-        "group by DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12\n" +
-        "order by [SHIFT]\n" +
-        "\n" +
-        "UPDATE #billets\n" +
-        "SET \n" +
-        "    #billets.[CURRENT] = [L2Mill].[dbo].[Brigada].[BCur],\n" +
-        "    #billets.[BRIGADE_START] = [L2Mill].[dbo].[Brigada].[BDate]\n" +
-        "FROM #billets LEFT JOIN [L2Mill].[dbo].[Brigada] ON #billets.[BRIGADE] = [L2Mill].[dbo].[Brigada].ID\n" +
-        "\n" +
-        "\n" +
-        "SELECT\n" +
-        "    DATEADD(SECOND, [SHIFT] * 43200, '2014-06-02 08:00:00') AS beginTS,\n" +
-        "    DATEADD(SECOND, ([SHIFT] + 1) * 43200 - 1, '2014-06-02 08:00:00') AS endTS,\n" +
-        "    LAST_MONTH.BRIGADE as brigade,\n" +
-        "    [CURRENT],\n" +
-        "    [BRIGADE_START],\n" +
-        "    [SHIFT_COUNT] as shiftCount, \n" +
-        "    [SHIFT_WEIGHT] as shiftWeight, \n" +
-        "    [MONTH_COUNT] as monthCount, \n" +
-        "    [MONTH_WEIGHT] as monthWeight\n" +
-        "FROM (\n" +
-        "    SELECT \n" +
-        "        [BRIGADE], \n" +
-        "        MAX([CURRENT]) AS [CURRENT],\n" +
-        "        MAX([BRIGADE_START]) AS [BRIGADE_START],\n" +
-        "        [SHIFT], \n" +
-        "        SUM([COUNT]) as [SHIFT_COUNT], \n" +
-        "        SUM([BILLETWEIGHT]) as [SHIFT_WEIGHT] \n" +
-        "    FROM #billets\n" +
-        "    WHERE [SHIFT] IN (\n" +
-        "        SELECT \n" +
-        "            MAX(SHIFT) \n" +
-        "        from #billets \n" +
-        "        GROUP BY [BRIGADE]) \n" +
-        "    GROUP BY [BRIGADE], [SHIFT]) AS LAST_SHIFT\n" +
-        "    LEFT JOIN (\n" +
-        "        SELECT \n" +
-        "            [BRIGADE], \n" +
-        "            SUM([COUNT]) as [MONTH_COUNT], \n" +
-        "            SUM([BILLETWEIGHT]) as [MONTH_WEIGHT]\n" +
-        "        FROM #billets\n" +
-        "        GROUP BY [BRIGADE]) AS LAST_MONTH ON LAST_SHIFT.BRIGADE = LAST_MONTH.BRIGADE\n" +
-        "ORDER BY brigade DESC;\n",
+    // statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
+    //     "INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
+    //     "\n" +
+    //     "CREATE TABLE #billets (\n" +
+    //     "    [ID] INT IDENTITY,\n" +
+    //     "    [SHIFT] [numeric](9, 0) NULL,\n" +
+    //     "    [BRIGADE] [numeric](9, 0) NULL,\n" +
+    //     "    [CURRENT] [numeric](9, 0) NULL,\n" +
+    //     "    [BRIGADE_START] [datetime] NULL,\n" +
+    //     "    [COUNT] [numeric](9) NULL,\n" +
+    //     "    [COUNTGB] [numeric](9) NULL,\n" +
+    //     "    [BILLETWEIGHT] [numeric](9) NULL,\n" +
+    //     ")\n" +
+    //     "\n" +
+    //     "insert into #billets ([SHIFT], [BRIGADE], [CURRENT], [BRIGADE_START], [COUNT], [COUNTGB], [BILLETWEIGHT])\n" +
+    //     "SELECT\n" +
+    //     "    DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12 as [SHIFT],\n" +
+    //     "    MAX(brigade) as [BRIGADE],\n" +
+    //     "    0,\n" +
+    //     "    '',\n" +
+    //     "    SUM(CASE EVENT WHEN 0 THEN 1 ELSE 0 END) as [COUNT],\n" +
+    //     "    SUM(CASE EVENT WHEN -10 THEN 1 WHEN -11 THEN 1 ELSE 0 END) as [COUNTGB],\n" +
+    //     "    SUM(CASE EVENT WHEN 0 THEN [BILLET_WEIGHT] ELSE 0 END) as [BILLETWEIGHT]\n" +
+    //     "FROM [L2Mill].[dbo].[L2_PO_BILLET]\n" +
+    //     "    LEFT JOIN #sheldule ON id_sheldule = (DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12) % 8 + 1\n" +
+    //     "WHERE [DATE_RECORD] > '2020-04-30 20:00:00'\n" +
+    //     "group by DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12\n" +
+    //     "order by [SHIFT]\n" +
+    //     "\n" +
+    //     "UPDATE #billets\n" +
+    //     "SET \n" +
+    //     "    #billets.[CURRENT] = [L2Mill].[dbo].[Brigada].[BCur],\n" +
+    //     "    #billets.[BRIGADE_START] = [L2Mill].[dbo].[Brigada].[BDate]\n" +
+    //     "FROM #billets LEFT JOIN [L2Mill].[dbo].[Brigada] ON #billets.[BRIGADE] = [L2Mill].[dbo].[Brigada].ID\n" +
+    //     "\n" +
+    //     "\n" +
+    //     "SELECT\n" +
+    //     "    DATEADD(SECOND, [SHIFT] * 43200, '2014-06-02 08:00:00') AS beginTS,\n" +
+    //     "    DATEADD(SECOND, ([SHIFT] + 1) * 43200 - 1, '2014-06-02 08:00:00') AS endTS,\n" +
+    //     "    LAST_MONTH.BRIGADE as brigade,\n" +
+    //     "    [CURRENT],\n" +
+    //     "    [BRIGADE_START],\n" +
+    //     "    [SHIFT_COUNT] as shiftCount, \n" +
+    //     "    [SHIFT_WEIGHT] as shiftWeight, \n" +
+    //     "    [MONTH_COUNT] as monthCount, \n" +
+    //     "    [MONTH_WEIGHT] as monthWeight\n" +
+    //     "FROM (\n" +
+    //     "    SELECT \n" +
+    //     "        [BRIGADE], \n" +
+    //     "        MAX([CURRENT]) AS [CURRENT],\n" +
+    //     "        MAX([BRIGADE_START]) AS [BRIGADE_START],\n" +
+    //     "        [SHIFT], \n" +
+    //     "        SUM([COUNT]) as [SHIFT_COUNT], \n" +
+    //     "        SUM([BILLETWEIGHT]) as [SHIFT_WEIGHT] \n" +
+    //     "    FROM #billets\n" +
+    //     "    WHERE [SHIFT] IN (\n" +
+    //     "        SELECT \n" +
+    //     "            MAX(SHIFT) \n" +
+    //     "        from #billets \n" +
+    //     "        GROUP BY [BRIGADE]) \n" +
+    //     "    GROUP BY [BRIGADE], [SHIFT]) AS LAST_SHIFT\n" +
+    //     "    LEFT JOIN (\n" +
+    //     "        SELECT \n" +
+    //     "            [BRIGADE], \n" +
+    //     "            SUM([COUNT]) as [MONTH_COUNT], \n" +
+    //     "            SUM([BILLETWEIGHT]) as [MONTH_WEIGHT]\n" +
+    //     "        FROM #billets\n" +
+    //     "        GROUP BY [BRIGADE]) AS LAST_MONTH ON LAST_SHIFT.BRIGADE = LAST_MONTH.BRIGADE\n" +
+    //     "ORDER BY brigade DESC;\n",
     // Получаем текущую остановку стана 350
     // getHourlyDelays: "SELECT [DELAY_STATE], [DELAY_DATETIME] as 'start', [FINISH_DELAY_DATETIME] as 'finish',\n" +
     //     "[FINISH_DELAY_DATETIME] - [DELAY_DATETIME] as 'len', DATEPART(HOUR, [DELAY_DATETIME]) AS [Hour]\n" +
     //     "FROM [L2Mill].[dbo].[L2_DELAY_HALTLFM1]\n" +
     //     "WHERE [DELAY_DATETIME] > @startTs AND [FINISH_DELAY_DATETIME] < @finishTs;\n",
+    statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
+        "INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
+        "\n" +
+        "CREATE TABLE #billets (\n" +
+        "\t[ID] INT IDENTITY,\n" +
+        "\t[SHIFT] [numeric](9, 0) NULL,\n" +
+        "\t[BRIGADE] [numeric](9, 0) NULL,\n" +
+        "\t[COUNT] [numeric](9) NULL,\n" +
+        "\t[COUNTGB] [numeric](9) NULL,\n" +
+        "\t[BILLETWEIGHT] [numeric](9) NULL,\n" +
+        ")\n" +
+        " insert into #billets ([SHIFT],[BRIGADE],[COUNT],[COUNTGB],[BILLETWEIGHT])\n" +
+        "SELECT \n" +
+        "\tDATEDIFF(hour, '20140602 08:00:00', [DATE_RECORD]) / 12 as [SHIFT],\n" +
+        "\tMAX(brigade) as [BRIGADE] ,\n" +
+        "\tSUM(CASE EVENT WHEN 0 THEN 1 ELSE 0 END) as [COUNT],\n" +
+        "\tSUM(CASE EVENT WHEN -10 THEN 1 WHEN -11 THEN 1 ELSE 0 END) as [COUNTGB],\n" +
+        "\tSUM(CASE EVENT WHEN 0 THEN [BILLET_WEIGHT] ELSE 0 END) as [BILLETWEIGHT]\n" +
+        "FROM [L2Mill].[dbo].[L2_PO_BILLET]\n" +
+        "LEFT JOIN #sheldule ON id_sheldule = (DATEDIFF(hour, '20140602 08:00:00', [DATE_RECORD]) / 12) % 8 + 1\n" +
+        " WHERE [DATE_RECORD] > @monthBegin\n" +
+        "group by DATEDIFF(hour, '20140602 08:00:00', [DATE_RECORD]) / 12\n" +
+        "order by [SHIFT]\n" +
+        "\n" +
+        "SELECT DATEADD(SECOND, [SHIFT] * 43200, '20140602 08:00:00') AS beginTS,  \n" +
+        "\tDATEADD(SECOND, ([SHIFT] + 1) * 43200 - 1, '20140602 08:00:00') AS endTS, LAST_MONTH.BRIGADE as brigade, " +
+        "[SHIFT_COUNT] as shiftCount, [SHIFT_WEIGHT] as shiftWeight, [MONTH_COUNT] as monthCount, [MONTH_WEIGHT] as monthWeight\n" +
+        "FROM (SELECT [BRIGADE], [SHIFT], SUM([COUNT]) as [SHIFT_COUNT], SUM([BILLETWEIGHT]) as [SHIFT_WEIGHT]\n" +
+        "\tFROM #billets\n" +
+        "\tWHERE [SHIFT] IN (SELECT MAX(SHIFT) from #billets GROUP BY [BRIGADE]) GROUP BY [BRIGADE], [SHIFT]) AS LAST_SHIFT\n" +
+        "LEFT JOIN (SELECT [BRIGADE], SUM([COUNT]) as [MONTH_COUNT], SUM([BILLETWEIGHT]) as [MONTH_WEIGHT]\n" +
+        "\tFROM #billets \n" +
+        "\tGROUP BY [BRIGADE]) AS LAST_MONTH ON LAST_SHIFT.BRIGADE = LAST_MONTH.BRIGADE\n" +
+        "\tORDER BY brigade DESC",
     getCurDelay: "SELECT TOP (1) [DELAY_DATETIME] AS delayStart\n" +
         "FROM [L2Mill].[dbo].[L2_DELAY_HALTLFM1]\n" +
         "WHERE [FINISH_DELAY_DATETIME] IS NULL\n" +
@@ -266,7 +300,7 @@ const Model = {
 
         // Получение данных о бригадах (процент выполнения плана и производственные показатели)
         let request = s350.request();
-        let statBrigades = await request.query(s350Queries.getPrevBrigades).catch(e => console.log(e));
+        let statBrigades = await request.query(s350Queries.getStatBrigades).catch(e => console.log(e));
         for (let stat of statBrigades.recordset) {
             result_data.s350.dev_shift[stat.ID] = stat.BWeight350;
             result_data.s210.dev_shift[stat.ID] = stat.BWeight210;
@@ -464,11 +498,13 @@ const Model = {
                 result = await request.query(s210Queries.getHourStats).catch(e =>console.log(e));
             }
             for (let row of result.recordset) {
-                res = {};
-                res['Hour'] = row.Hour;
-                res['Percent'] = row.Percent;
-                res['Weight'] = row.Weight;
-                data.push(res);
+                if (!isNaN(row.Weight)) {
+                    res = {};
+                    res['Hour'] = row.Hour;
+                    res['Percent'] = row.Percent;
+                    res['Weight'] = row.Weight;
+                    data.push(res);
+                }
             }
             return data;
         }
@@ -560,7 +596,7 @@ const Model = {
         // if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
         let result = await request.query(s350Queries.updateBStats).catch(e => {return false}); 
         if (result.rowsAffected.length) {
-            brigades.setSaved(true);
+            // brigades.setSaved(true);
         }
         return true;
     },
@@ -574,12 +610,14 @@ const Model = {
         let brigDate = currBrig.BDate;
         brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
         let activeBrig = await brigades.getActiveBrigade(pool);   // Номер активной бригады
-        let saved = brigades.isSaved();                 // Флаг сохранения текущей бригады;
+        // let saved = brigades.isSaved();                 // Флаг сохранения текущей бригады;
         const today = new Date();                       // Текущее время
 
         // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
-        if ( (Number(today) - Number(currBrig.BDate) <= 60000 && !saved) ) {
+        if ( (Number(today) - Number(currBrig.BDate) <= 60000 /* && !saved */ ) ) {
             // Бригада работает менее минуты и статус не сохранен
+            //FIXME: Постоянно попадает saved == true, нужно считать только те часы,
+            // которые уже прошли, а не все часы смены, тогда не нужно делать обнуление
             let shift;
             if (today.getHours() == 8) {
                 shift = "Day";
@@ -597,8 +635,8 @@ const Model = {
                 // Обнуляем почасовую статистику
                 let reseted = brigades.getReseted();
                 if (!reseted) {
-                    let reset = await this.resetHourlyStats(local);
-                    if (reset) {
+                    let reset = await this.resetHourlyStats(local); // Не отработало обнуление
+                    if (reset) {                                    // Неправильно считается показатель производства с начала месяца по бригадам
                         console.log('Hourly stats was been reseted!');
                     };
                 }
@@ -607,7 +645,7 @@ const Model = {
             };
         }
         if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
-            brigades.setSaved(false);
+            // brigades.setSaved(false);
             brigades.setReseted(false);
         }
 
@@ -619,6 +657,8 @@ const Model = {
 
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
+        //FIXME: Если не получится вариант обойтись без флага сохранения бригады,
+        // то расчитывать дневной процент только по часам, которые уже прошли и текущему часу (currHour <= hour <= startHour)
         let perc = 0;
         let weight =0;
         const timeShift = {
@@ -626,6 +666,9 @@ const Model = {
             "Night": ['20', '21', '22', '23', '0', '1', '2', '3', '4', '5', '6', '7', '8']
         };
         let curr = [];
+        const today = new Date();
+        const currHour = today.getHours();
+        let hours = 0;
 
         await this.calcPercent(stan, toLocal); // Заполняем данные по часам
 
@@ -643,13 +686,14 @@ const Model = {
 
         let daily = await this.readHourlyPercent(stan, toLocal);
 
-        for (day in daily) { 
-            if (curr.includes(day)) {
+        for (day in daily) {  // Изменить расчет : считать только до текущего часа
+            if (curr.includes(day) && Number(day) <= currHour) {
                 perc += daily[day].Percent;
                 weight += daily[day].Weight;
+                hours++;
             }
         }
-        perc = Math.round(perc / 12);
+        perc = Math.round(perc / hours);
         data['Percent'] = perc;
         data['Weight'] = weight;
         return data;
