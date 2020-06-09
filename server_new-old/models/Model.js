@@ -16,7 +16,9 @@ let s350Queries = {
     updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = @percent210, [BWeight210] = @weight210, " + 
         "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
-    resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = 100, [Weight] = 0;",
+    // getDaily350: "SELECT Count([Hour]) AS [Hours], AVG([Percent]) AS [Percent], SUM([Weight]) AS [Weight] FROM [L2Mill].[dbo].[Hourly350] WHERE [Hour] BETWEEN 8 AND 20;",
+    // getDaily210: "SELECT Count([Hour]) AS [Hours], AVG([Percent]) AS [Percent], SUM([Weight]) AS [Weight] FROM [L2Mill].[dbo].[Hourly210] WHERE [Hour] BETWEEN 8 AND 20;",
+    resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly350] SET [Percent] = 0, [Weight] = 0;",
     getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly350] ORDER BY [Hour];",
     prodList: "SELECT\n" +
         "[AllPack].[Size],\n" +
@@ -290,8 +292,7 @@ const Model = {
             shift_start: await this.getShiftStart(), // Получение времени начала смены текущей бригады   
             temp_in: await this.getSPCTemperature(), // Температура воздуха в цеху
             temp_out: await this.getTemperature(), // Температура воздуха на улице
-            // current_brigade: await this.getSelectedBrigade(s350, toLocal), // Получение номера активной (выбранной на табло) бригады
-            current_brigade: await brigades.getActiveBrigade(s350),
+            current_brigade: await brigades.getActiveBrigade(s350), // Получение номера активной (выбранной на табло) бригады
             spc_month: 0, // Прокатано по цеху с начала месяца
             spc_year: 0,  // Прокататно по цеху с начала года
         };
@@ -314,6 +315,7 @@ const Model = {
     getStats: async function(stan, pool, queries) {
         await pool.connect();
         try {
+            await this.calcBrigades(pool, false);
             let request = pool.request();
             const today = new Date();
             const monthBegin = new Date(today.getFullYear(), today.getMonth() , 1, -4, 0, 0); // 20 часов последнего дня предыдущего месяца
@@ -333,7 +335,7 @@ const Model = {
             };
 
             // Получение данных о производственых показателях предыдущих бригад
-            await this.calcBrigade(false);
+            
             stats.start_year = Math.round(await this.getFromStartYear(stan, pool) / 1000.0); // Получение показателей по станам с начала года
             stats.start_month = Math.round(await this.getFromStartMonth(stan, pool) / 1000.0); // Получение показателей по станам с начала месяца
             let resultCurDelay = await request.query(queries.getCurDelay); // Получение данных о текущей остановке стана
@@ -451,7 +453,7 @@ const Model = {
                 res = true;
             }
         }
-        // brigades.setReseted(true);
+        brigades.setReseted(res);
         return res;
     },
     
@@ -485,6 +487,7 @@ const Model = {
     // Получение данных о всех часах работы текущей бригады
     readHourlyPercent: async function(stan, local) {
         // Читаем все записи статуса часов по выбранному стану
+        // Изменить запрос на группировку
         if (local) {
             let data = hourlyStore.get(stan);
             return data;
@@ -597,105 +600,94 @@ const Model = {
         // if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
         let result = await request.query(s350Queries.updateBStats).catch(e => {return false}); 
         if (result.rowsAffected.length) {
-            // brigades.setSaved(true);
+            brigades.setSaved(true);
         }
         return true;
     },
 
 
-    calcBrigade: async function(toLocal = false) {
-        // Расчет данных бригады
-        // Получаем номер текущей бригады из БД (по данным 7-го поста)
-        let currBrig = await brigades.getCurrentBrigade(s350);
-
-        // Получаем ранее сохраненный номер текущей бригады (предыдущая бригада)
-        let lastBrig = brigades.getLastBrigade();
-        
-        // Получаем признак сброшенного состояния бригады
-        let reseted = brigades.getReseted();
-
-        // Если номер текущей бригады не равен номеру предыдущей бригады
-        if (currBrig.ID == lastBrig) {
-            // Сбросить флаг "сброшено"
-            reseted = false;
-            brigades.setReseted(reseted);
-
-            // Расчитать и сохранить производственные показатели бригады за смену
-            await this.saveShiftStat(currBrig.ID);
-        } else {
-            // Если номер текущей бригады не равен номеру предыдущей бригады (смена бригады)
-            // Сохранить состояние предыдущей бригады
-            await this.saveShiftStat(lastBrig);
-
-            // Сбросить почасовые показатели
-            reseted = await this.resetHourlyStats(toLocal);
-            brigades.setReseted(reseted);
-
-            // Сохранить номер текущей бригады как предыдущей
-            lastBrig = currBrig;
-            brigades.setLastBrigade(currBrig.ID);
-        }
-        
-    },
-
-
     // Определяем номер бригады, которая должна заступить на смену
-    getSelectedBrigade: async function(pool, local) {
+    calcBrigades: async function(pool, local) {
 
         // Проверяем время
-        let currBrig = await brigades.getCurrentBrigade(pool);    // Номер текущей бригады и время начала ее смены
-        let brigDate = currBrig.BDate;
-        brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
-        let activeBrig = await brigades.getActiveBrigade(pool);   // Номер активной бригады
-        // let saved = brigades.isSaved();                 // Флаг сохранения текущей бригады;
-        const today = new Date();                       // Текущее время
+        let currBrig = await brigades.getCurrentBrigade(s350);    // Номер текущей бригады и время начала ее смены
+        let lastBrig = brigades.getLastBrigade();                 // Номер бригады с предыдущей смены
+        let activeBrig = await brigades.getActiveBrigade(s350);   // Номер активной бригады
+        let reseted = brigades.getReseted();
+        let saved = brigades.getSaved();
 
-        // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
-        if ( (Number(today) - Number(currBrig.BDate) <= 60000 /* && !saved */ ) ) {
-            // Бригада работает менее минуты и статус не сохранен
-            //FIXME: Постоянно попадает saved == true, нужно считать только те часы,
-            // которые уже прошли, а не все часы смены, тогда не нужно делать обнуление
-            let shift;
-            if (today.getHours() == 8) {
-                shift = "Day";
-            } else {
-                shift = "Night";
+        if (currBrig == lastBrig) {
+            // Предыдущая бригада не равна текущей - смены бригады не было
+            brigades.setReseted(false); // Состояние бригады не сброшено
+            brigades.setSaved(false);   // Состояние бригады не сохранено
+            activeBrig = currBrig;
+            brigades.setActiveBrigade(currBrig);
+            reseted = false;
+            saved = false;
+        } else {
+            // Номер предыдущей бригады равен номеру текущей бригады - произошла смена бригады
+            // Сохраняем номер новой бригады, как предыдущей
+            brigades.setLastBrigade(currBrig);
+
+            if (!reseted) {
+                reseted = await this.resetHourlyStats(local);
             }
-            let prevBrig = brigades.getPrevBrigade(currBrig.ID, shift);
-            let isSaved = await this.saveShiftStat(prevBrig);
-            // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
-            if (isSaved) {
-                if (_DEBUG) {
-                    debug.writelog(`getSelectedBrigade() => Состояние бригады: [${isSaved}], запуск процедуры сброса почасового состояния \n`);
-                    
-                }
-                // Обнуляем почасовую статистику
-                let reseted = brigades.getReseted();
-                if (!reseted) {
-                    let reset = await this.resetHourlyStats(local); // Не отработало обнуление
-                    if (reset) {                                    // Неправильно считается показатель производства с начала месяца по бригадам
-                        console.log('Hourly stats was been reseted!');
-                    };
-                }
-            } else {
-                console.log("Error saving current brigade state.");
-            };
-        }
-        if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
-            // brigades.setSaved(false);
-            brigades.setReseted(false);
-        }
-
-        // Сохраняем производственные показатели текущей бригады
-        // if (_DEBUG) debug.writelog(`getSelectedBrigade() =>  Активная бригада: [${activeBrig}], Текущая бригада: [${currBrig.ID}]`);
-        await this.saveShiftStat(currBrig.ID);
+        };
+        saved = await this.saveShiftStat(lastBrig);
         return activeBrig;
+
+        // let brigDate = currBrig.BDate;
+        // brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
+        // let saved = brigades.isSaved();                           // Флаг сохранения текущей бригады;
+
+        // const today = new Date();                       // Текущее время
+
+        // // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
+        // if ( (Number(today) - Number(currBrig.BDate) <= 60000) && (currBrig != lastBrig))  {
+        //     // Бригада работает менее минуты и предыдущая бригада не сохранена
+
+        //     brigades.setLastBrigade(currBrig); 
+        //     let shift;
+        //     if (today.getHours() == 8) {
+        //         shift = "Day";
+        //     } else {
+        //         shift = "Night";
+        //     }
+        //     // let prevBrig = brigades.getPrevBrigade(currBrig.ID, shift);
+        //     let isSaved = await this.saveShiftStat(lastBrig);
+        //     // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
+        //     if (isSaved) {
+        //         // Обнуляем почасовую статистику
+        //         let reseted = brigades.getReseted();
+        //         if (!reseted) {
+        //             if (_DEBUG) {
+        //                 debug.writelog(`getSelectedBrigade() => Состояние бригады не сброшено, запуск процедуры сброса дневного состояния \n`);
+        //             }
+        //             let reset = await this.resetHourlyStats(local); // Не отработало обнуление
+        //             if (reset) {                                    // Неправильно считается показатель производства с начала месяца по бригадам
+        //                 console.log('Hourly stats was been reseted!');
+        //             };
+        //         }
+        //     } else {
+        //         console.log("Error saving current brigade state.");
+        //     };
+        // }
+        // if ( (Number(today) - Number(currBrig.BDate) > 600000) ) {
+        //     // Бригада работает уже более 10 минут, устанавливаем флаг, что состояние бригады не сброшено
+        //     brigades.setReseted(false);
+        // }
+
+        // // Сохраняем производственные показатели текущей бригады
+        // // if (_DEBUG) debug.writelog(`getSelectedBrigade() =>  Активная бригада: [${activeBrig}], Текущая бригада: [${currBrig.ID}]`);
+        // await this.saveShiftStat(currBrig.ID);
+        // return activeBrig;
     },
 
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
         //FIXME: Если не получится вариант обойтись без флага сохранения бригады,
         // то расчитывать дневной процент только по часам, которые уже прошли и текущему часу (currHour <= hour <= startHour)
+        // SELECT AVG([Percent]), SUM([Weight]) FROM [L2Mill].[dbo].[Hourly350];
         let perc = 0;
         let weight =0;
         const timeShift = {
@@ -720,6 +712,7 @@ const Model = {
             // Заступила ночная смена, устанавливаем часы ночной смены
             curr = timeShift.Night;
         }
+
 
         let daily = await this.readHourlyPercent(stan, toLocal);
 

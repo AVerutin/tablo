@@ -11,6 +11,11 @@ const Brigades = {
         // saved = true - Все изменения сохранены
         local.set('Saved', saved);
     },
+
+    getSaved: function() {
+        // Возвращает флаг сохранения бригады
+        return local.get('Saved');
+    },
     
     setReseted: function(reseted) {
         local.set('Reseted', reseted);
@@ -20,30 +25,11 @@ const Brigades = {
         return local.get('Reseted');
     },
 
-    isSaved: function() {
-        // Возвращает флаг сохранения бригады
-        // isSaved = true - Все изменения сохранены
-        return local.get('Saved');
-    },
-
-    setActiveBrigade: function(brigNum, saved) {
+    setActiveBrigade: function(brigNum) {
         // Установить активную бригаду
         let brig = {};
         brig['Brigada'] = brigNum;
-        brig['Saved'] = saved;
         local.set(brig);
-    },
-
-    getLastBrigade: function() {
-        // Получить номер бригады с прошедшей смены
-        return local.get('Last');
-    },
-
-    setLastBrigade: function(last) {
-        // Сохраняем номер бригады с предыдущей смены
-        if (last != 0) {
-            local.set('Last', last);
-        }
     },
 
     getActiveBrigade: async function(pool) {
@@ -53,35 +39,27 @@ const Brigades = {
         if (!brig) {
             // активная бригада не была установлена ранее, получаем номер текущей из БД
             brig = currBrig.ID;
-            this.setActiveBrigade(brig, false);
+            this.setActiveBrigade(brig);
         }
 
         // Проверяем, не пришло ли время сменить активную бригаду
         const today = new Date();
         const currHour = today.getHours();
         const currMinutes = today.getMinutes();
-        // const currSeconds = today.getSeconds();
 
         if ( (currHour == 8) || (currHour == 20) ) { // Определение часа смены бригады
             if (currMinutes <= 1) {                  // Определение минуты смены бригады  
                 let brigDate = currBrig.BDate;
                 brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
-                if (Number(today) - Number(brigDate) >= /* 3600000 */ 39600000 ) {  // Определяем время работы бригады, если большее 11 часов, получаем следующую после currBrig
+                if (Number(today) - Number(brigDate) >= 39600000) {  // Определяем время работы бригады, если большее 11 часов, получаем следующую после currBrig
                     let nextBrig = 0;
-                    if (currHour == 8 /* 8 */) {
+                    if (currHour == 8) {
                         nextBrig = this.getNextBrigade(currBrig.ID, "Night");
                     } else {
                         nextBrig = this.getNextBrigade(currBrig.ID, "Day");
                     };
-                    // Установить флаг необходимости сохранения состояния и вернуть в вызывающий метод
-                    this.setActiveBrigade(nextBrig, true);
+                    this.setActiveBrigade(nextBrig);
                     brig = nextBrig;
-                    this.setLastBrigade(currBrig.ID);
-
-                    // Добавить обнуление результатов активной бригады сразу после начала ее смены (% выполнения за день и производство с начала смены)
-                    if (currSeconds <= 10) {
-                        this.resetActiveBrigade(pool, brig);
-                    }
                 }
             }
         }
@@ -91,7 +69,7 @@ const Brigades = {
     resetActiveBrigade: async function(pool, brig) {
         // Сброс производственных показателей активной бригады в начале рабочей смены
         let request = pool.request();
-        const sqlQuery = "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = 100, [BWeight210] = 0, [BPercent350] = 100, " +
+        const sqlQuery = "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = 0, [BWeight210] = 0, [BPercent350] = 0, " +
             "[BWeight350] = 0 WHERE [ID] = @currBrig;";
         request.input('currBrig', brig);
         await request.query(sqlQuery).catch(e => console.log(e));
@@ -105,10 +83,22 @@ const Brigades = {
         let result = await request.query(brigadeQuery).catch(e => console.log(e));
         if (result.recordset.length > 0) {
             for (row of result.recordset) {
-                res = row;
+                res = row.ID;
             }
         }
         return res;
+    },
+
+    getLastBrigade: function() {
+        // Получить номер бригады с прошедшей смены
+        return local.get('Last');
+    },
+
+    setLastBrigade: function(last) {
+        // Сохраняем номер бригады с предыдущей смены
+        if (last != 0) {
+            local.set('Last', last);
+        }
     },
 
     getNextBrigade: function(brig, shift) {
