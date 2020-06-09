@@ -604,7 +604,7 @@ const Model = {
 
 
     calcBrigade: async function(toLocal = false) {
-        // Расчет данных бригады
+        // Расчет данных для текущей бригады
         // Получаем номер текущей бригады из БД (по данным 7-го поста)
         let currBrig = await brigades.getCurrentBrigade(s350);
 
