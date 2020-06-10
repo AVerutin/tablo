@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const Model = require('../models/Model');
-// const oldModel = require('../models/Model_old');
 const jwt = require('jsonwebtoken');
 const config = require('config');
 
@@ -54,11 +53,5 @@ router.post('/login', async (req, res) =>{
     }
     else return res.status(401).send({ auth: false, token: null });
 });
-
-//////////// TEST MY API ///////////////
-router.get('/getProfiles', async(req, res) => {
-    let data = await Model.getHourlyProd();
-    res.json(data);
-})
 
 module.exports = router;
