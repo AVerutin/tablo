@@ -13,10 +13,12 @@ const Brigades = {
     },
     
     setReseted: function(reseted) {
+        // Установка флага сброса почасовой статистики при заступлении новой смены
         local.set('Reseted', reseted);
     },
 
     getReseted: function() {
+        // Запрос флага сброса почасовой статистики при заступлении новой смены
         return local.get('Reseted');
     },
 
@@ -52,7 +54,7 @@ const Brigades = {
     },
 
     getNulled: function() {
-        // 
+        // Запрос флага обнуления сводных данных о вновь заступившей бригаде
         return local.get('Nulled');
     },
 

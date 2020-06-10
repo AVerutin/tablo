@@ -522,6 +522,9 @@ const Model = {
             case 's350' : table = "Hourly350"; break;
             case 's210' : table = "Hourly210"; break;
         }
+
+        // Выполнение запроса для получения сводной статистики по текущей бригаде,
+        // рассчитываемой на основании почасового проката и выполнения плана
         const query = `SELECT Count([Hour]) AS [Hours], AVG([Percent]) AS [Percent], SUM([Weight]) AS [Weight] FROM [L2Mill].[dbo].[${table}] WHERE [Hour] IN (${curr});`;
         let request = s350.request();
         let result = await request.query(query).catch(e => console.log(e));
