@@ -46,6 +46,16 @@ const Brigades = {
         }
     },
 
+    setNulled: function(nulled) {
+        // Установка флага обнуления сводных данных о вновь заступившей бригаде
+        local.set('Nulled', nulled);
+    },
+
+    getNulled: function() {
+        // 
+        return local.get('Nulled');
+    },
+
     getActiveBrigade: async function(pool) {
         // Получить номер активной бригады
         let brig = local.get('Brigada');
@@ -60,15 +70,14 @@ const Brigades = {
         const today = new Date();
         const currHour = today.getHours();
         const currMinutes = today.getMinutes();
-        // const currSeconds = today.getSeconds();
 
         if ( (currHour == 8) || (currHour == 20) ) { // Определение часа смены бригады
-            if (currMinutes <= 1) {                  // Определение минуты смены бригады  
+            if (currMinutes <= 10) {                  // Определение минуты смены бригады  
                 let brigDate = currBrig.BDate;
                 brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
-                if (Number(today) - Number(brigDate) >= /* 3600000 */ 39600000 ) {  // Определяем время работы бригады, если большее 11 часов, получаем следующую после currBrig
+                if (Number(today) - Number(brigDate) >= 39600000) {  // Определяем время работы бригады, если большее 11 часов, получаем следующую после currBrig
                     let nextBrig = 0;
-                    if (currHour == 8 /* 8 */) {
+                    if (currHour == 8) {
                         nextBrig = this.getNextBrigade(currBrig.ID, "Night");
                     } else {
                         nextBrig = this.getNextBrigade(currBrig.ID, "Day");
@@ -77,13 +86,15 @@ const Brigades = {
                     this.setActiveBrigade(nextBrig, true);
                     brig = nextBrig;
                     this.setLastBrigade(currBrig.ID);
-
-                    // Добавить обнуление результатов активной бригады сразу после начала ее смены (% выполнения за день и производство с начала смены)
-                    if (currSeconds <= 10) {
+                    let nulled = this.getNulled();
+                    if (!nulled) {
                         this.resetActiveBrigade(pool, brig);
+                        this.setNulled(true);
                     }
                 }
             }
+        } else {
+            this.setNulled(false);
         }
         return brig;
     },

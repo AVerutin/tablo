@@ -1,6 +1,7 @@
 {
-  "Brigada": 1,
-  "Last": 1,
+  "Brigada": 2,
   "Saved": true,
-  "Reseted": false
+  "Reseted": false,
+  "Last": 2,
+  "Nulled": false
 }

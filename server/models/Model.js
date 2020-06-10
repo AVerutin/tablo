@@ -6,12 +6,10 @@ const store = require('data-store')({ path: process.cwd() + '/delay_plan.json' }
 const hourlyStore = require('data-store')( {path: process.cwd() + '/hourly.json' } );
 const debug = require("./debug_log");
 
-const _DEBUG = true;
+const _DEBUG = false;
 const toLocal = false;
 
 let s350Queries = {
-    // getPrevBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] WHERE [ID] NOT IN \n" +
-    //     "(SELECT [ID] FROM [L2Mill].[dbo].[Brigada] WHERE [BCur] = 1)",
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
     updateBStats: "UPDATE [L2Mill].[dbo].[BrigadaStats] SET [BPercent210] = @percent210, [BWeight210] = @weight210, " + 
         "[BPercent350] = @percent350, [BWeight350] = @weight350 WHERE ID = @currBrigada;",
@@ -28,7 +26,6 @@ let s350Queries = {
         "ORDER BY [AllPack].[DataWeight] ASC;",
     planProd: "SELECT * FROM [L2Mill].[dbo].[Dev_Plan_350_Profiles]",
     brigadeQuery: "SELECT [ID], [BDate] FROM [L2Mill].[dbo].[Brigada] WHERE BCur > 0",
-    // allBrigades: "SELECT * FROM [L2Mill].[dbo].[Brigada] ORDER BY [ID]",
     // Получаем список всех остановок стана 350
     delayQuery: "SELECT [DELAY_DATETIME] as start\n" +
         "      ,[FINISH_DELAY_DATETIME] as finish\n" +
@@ -38,118 +35,6 @@ let s350Queries = {
     prodPeriod: "SELECT SUM([Weight]) as 'Weigth'\n" +
         "FROM [L2Mill].[dbo].[AllPack]\n" +
         "WHERE [DataWeight] >= @startPeriod;",
-    // Получение почасового проката за выбранный период
-    // в разрезе Профмля и Длины с почасовым планом проката
-    // hourlyProduction: "CREATE TABLE #tplan (\n" +
-    //     "[ID] [numeric](9, 0) IDENTITY(1,1) NOT NULL,\n" +
-    //     "[Size] [nvarchar](10) NULL,\n" +
-    //     "[Length] [nvarchar](10) NULL,\n" +
-    //     "[Weight] [numeric](12, 0) NULL,\n" +
-    //     "[Long_Hour] [numeric](4, 0) NULL,\n" +
-    //     "[Middle_Hour] [numeric](4, 0) NULL,\n" +
-    //     "[Short_Hour] [numeric](4, 0) NULL,\n" +
-    //     "[DataWeight] [datetime] NULL\n" +
-    //     ");\n" +
-    //     "INSERT INTO #tplan ([Size], [Length], [Weight], [LONG_HOUR], [MIDDLE_HOUR], [SHORT_HOUR], [DataWeight])\n" +
-    //     "SELECT\n" +
-    //         "[Size],\n" +
-    //         "[Length],\n" +
-    //         "[Weight],\n" +
-    //         "[LONG_HOUR],\n"+
-    //         "[MIDDLE_HOUR],\n" +
-    //         "[SHORT_HOUR],\n" +
-    //         "[DataWeight]\n" +
-    //     "FROM [L2Mill].[dbo].[AllPack] LEFT JOIN [L2Mill].[dbo].[Dev_Plan_350_Profiles] ON [L2Mill].[dbo].[AllPack].[Size] = [L2Mill].[dbo].[Dev_Plan_350_Profiles].[PROFILE]\n" +
-    //     "WHERE [DataWeight] BETWEEN @startTs AND @finishTs\n" +
-    //     "ORDER BY [DataWeight] DESC;\n" +
-    //     "SELECT\n" +
-    //         "[Size],\n" +
-    //         "[Length],\n" +
-    //         "SUM([Weight]) AS [Weight],\n" +
-    //         "MAX([LONG_HOUR]) AS [Plan_Long],\n" +
-    //         "MAX([MIDDLE_HOUR]) AS [Plan_Midd],\n" +
-    //         "MAX([SHORT_HOUR]) AS [Plan_Short],\n" +
-    //         "MIN([DataWeight]) AS [StartTS],\n" +
-    //         "MAX([DataWeight]) AS [FinishTS],\n" +
-    //         "MAX([DataWeight]) - MIN([DataWeight]) AS [LengthTS],\n" +
-    //         "DATEPART(HOUR, [DataWeight]) AS [Hour]\n" +
-    //     "FROM #tplan\n" +
-    //     "GROUP BY [Size], [Length], (DATEPART(HOUR, [DataWeight]))\n" +
-    //     "ORDER BY [StartTS];\n",
-    // statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
-    //     "INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
-    //     "\n" +
-    //     "CREATE TABLE #billets (\n" +
-    //     "    [ID] INT IDENTITY,\n" +
-    //     "    [SHIFT] [numeric](9, 0) NULL,\n" +
-    //     "    [BRIGADE] [numeric](9, 0) NULL,\n" +
-    //     "    [CURRENT] [numeric](9, 0) NULL,\n" +
-    //     "    [BRIGADE_START] [datetime] NULL,\n" +
-    //     "    [COUNT] [numeric](9) NULL,\n" +
-    //     "    [COUNTGB] [numeric](9) NULL,\n" +
-    //     "    [BILLETWEIGHT] [numeric](9) NULL,\n" +
-    //     ")\n" +
-    //     "\n" +
-    //     "insert into #billets ([SHIFT], [BRIGADE], [CURRENT], [BRIGADE_START], [COUNT], [COUNTGB], [BILLETWEIGHT])\n" +
-    //     "SELECT\n" +
-    //     "    DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12 as [SHIFT],\n" +
-    //     "    MAX(brigade) as [BRIGADE],\n" +
-    //     "    0,\n" +
-    //     "    '',\n" +
-    //     "    SUM(CASE EVENT WHEN 0 THEN 1 ELSE 0 END) as [COUNT],\n" +
-    //     "    SUM(CASE EVENT WHEN -10 THEN 1 WHEN -11 THEN 1 ELSE 0 END) as [COUNTGB],\n" +
-    //     "    SUM(CASE EVENT WHEN 0 THEN [BILLET_WEIGHT] ELSE 0 END) as [BILLETWEIGHT]\n" +
-    //     "FROM [L2Mill].[dbo].[L2_PO_BILLET]\n" +
-    //     "    LEFT JOIN #sheldule ON id_sheldule = (DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12) % 8 + 1\n" +
-    //     "WHERE [DATE_RECORD] > '2020-04-30 20:00:00'\n" +
-    //     "group by DATEDIFF(hour, '2014-06-02 08:00:00', [DATE_RECORD]) / 12\n" +
-    //     "order by [SHIFT]\n" +
-    //     "\n" +
-    //     "UPDATE #billets\n" +
-    //     "SET \n" +
-    //     "    #billets.[CURRENT] = [L2Mill].[dbo].[Brigada].[BCur],\n" +
-    //     "    #billets.[BRIGADE_START] = [L2Mill].[dbo].[Brigada].[BDate]\n" +
-    //     "FROM #billets LEFT JOIN [L2Mill].[dbo].[Brigada] ON #billets.[BRIGADE] = [L2Mill].[dbo].[Brigada].ID\n" +
-    //     "\n" +
-    //     "\n" +
-    //     "SELECT\n" +
-    //     "    DATEADD(SECOND, [SHIFT] * 43200, '2014-06-02 08:00:00') AS beginTS,\n" +
-    //     "    DATEADD(SECOND, ([SHIFT] + 1) * 43200 - 1, '2014-06-02 08:00:00') AS endTS,\n" +
-    //     "    LAST_MONTH.BRIGADE as brigade,\n" +
-    //     "    [CURRENT],\n" +
-    //     "    [BRIGADE_START],\n" +
-    //     "    [SHIFT_COUNT] as shiftCount, \n" +
-    //     "    [SHIFT_WEIGHT] as shiftWeight, \n" +
-    //     "    [MONTH_COUNT] as monthCount, \n" +
-    //     "    [MONTH_WEIGHT] as monthWeight\n" +
-    //     "FROM (\n" +
-    //     "    SELECT \n" +
-    //     "        [BRIGADE], \n" +
-    //     "        MAX([CURRENT]) AS [CURRENT],\n" +
-    //     "        MAX([BRIGADE_START]) AS [BRIGADE_START],\n" +
-    //     "        [SHIFT], \n" +
-    //     "        SUM([COUNT]) as [SHIFT_COUNT], \n" +
-    //     "        SUM([BILLETWEIGHT]) as [SHIFT_WEIGHT] \n" +
-    //     "    FROM #billets\n" +
-    //     "    WHERE [SHIFT] IN (\n" +
-    //     "        SELECT \n" +
-    //     "            MAX(SHIFT) \n" +
-    //     "        from #billets \n" +
-    //     "        GROUP BY [BRIGADE]) \n" +
-    //     "    GROUP BY [BRIGADE], [SHIFT]) AS LAST_SHIFT\n" +
-    //     "    LEFT JOIN (\n" +
-    //     "        SELECT \n" +
-    //     "            [BRIGADE], \n" +
-    //     "            SUM([COUNT]) as [MONTH_COUNT], \n" +
-    //     "            SUM([BILLETWEIGHT]) as [MONTH_WEIGHT]\n" +
-    //     "        FROM #billets\n" +
-    //     "        GROUP BY [BRIGADE]) AS LAST_MONTH ON LAST_SHIFT.BRIGADE = LAST_MONTH.BRIGADE\n" +
-    //     "ORDER BY brigade DESC;\n",
-    // Получаем текущую остановку стана 350
-    // getHourlyDelays: "SELECT [DELAY_STATE], [DELAY_DATETIME] as 'start', [FINISH_DELAY_DATETIME] as 'finish',\n" +
-    //     "[FINISH_DELAY_DATETIME] - [DELAY_DATETIME] as 'len', DATEPART(HOUR, [DELAY_DATETIME]) AS [Hour]\n" +
-    //     "FROM [L2Mill].[dbo].[L2_DELAY_HALTLFM1]\n" +
-    //     "WHERE [DELAY_DATETIME] > @startTs AND [FINISH_DELAY_DATETIME] < @finishTs;\n",
     statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
         "INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
         "\n" +
@@ -352,35 +237,18 @@ const Model = {
                     this.setDelayPlan(stan, oldValues);
                 }
             }
-            // Расчет процента выполнения плана
-            // let currentPrecent = await this.calcPercent(stan);
-            // brig = await this.getSelectedBrigade()
-            // stats.plan_perc[brig] = currentPrecent;
 
             // Заполнение данных по каждому стану
             for(let row of result.recordset) {
                 await this._fillStats(pool, queries.delayQuery, row, stats);
-                // Расчет процента выполнения плана за месяц
-                // Для текущей бригады считаем по своему алгоритму,
-                // Для остальных - берем ранее сохраненные данные
-                // brig = await this.getSelectedBrigade(s350, true);
-                // let currentData = await this.getDailyPercent(stan);
-                // if (!currentData) {
-                //     stats.plan_perc[brig.ID] = 0;
-                //     stats.dev_shift[brig.ID] = 0;
-                // } else {
-                //     stats.plan_perc[brig.ID] = currentData.Percent;
-                //     stats.dev_shift[brig.ID] = currentData.Weight;                    
-                // };
-                //stats.plan_perc[row.brigade] = (plan[row.brigade] === 0) ? 100 : Math.round(row.monthWeight/(plan[row.brigade]*10));
             }
-            //console.dir(stats);
             return stats;
         } catch (e) {
             console.error('SQL error', e);
             return [];
         }
     },
+
     // Заполнение очередной строки из результата запроса
     _fillStats: async function(pool, query, row, stats) {
         //stats[row.brigade] = row;
@@ -397,16 +265,12 @@ const Model = {
             delDuration += Math.max( delEnd - delStart , 0);    // Складываем время всех простоев за смену
         }
         delDuration = Math.min(delDuration, 12 * 3600000);      // Либо вся смена (12 часов), либо сумма всех простоев за смену
-        let pad = (n, z = 2) => ('00' + n).slice(-z);   // Форматированный вывод времени простоя в виде '01:22'
+        let pad = (n, z = 2) => ('00' + n).slice(-z);           // Форматированный вывод времени простоя в виде '01:22'
         stats.delay_shift[row.brigade] = pad(delDuration/3.6e6 | 0) + ':' + pad((delDuration%3.6e6)/6e4 | 0); // Добавляем в результат отформатированное время суммы простоев
         stats.dev_shift[row.brigade] = Math.round(row.shiftWeight/1000);    // Добавляем в результат вес прокатанного с начала смены в тоннах
         stats.dev_month[row.brigade] = Math.round(row.monthWeight/1000);    // Добавляем в результат вес прокатанного с начала месяца в тоннах
         return row;
     },
-
-    //////////////////////////////////////////////////////////////////////////
-    // Модуль по сохранению состояния текущей бригады в локальном хранилище //
-    //////////////////////////////////////////////////////////////////////////
 
     // Записать план производства по часам в базу данных
     setDevPlan: async function (plan) {
@@ -451,7 +315,6 @@ const Model = {
                 res = true;
             }
         }
-        // brigades.setReseted(true);
         return res;
     },
     
@@ -467,7 +330,7 @@ const Model = {
             request.input('hourPercent', data[hour].Percent);   //  /* Процент выполнения текущего часа */
             request.input('hourWeight', data[hour].Weight);     //  /* Сумма взвешенных пакетов за текущий час */
             request.input('currentHour', hour);                 //  /* Текущий час */
-            // if (_DEBUG) debug.writelog(`saveHourlyPercent (СТАН: [${stan}], ЧАС: [${hour}], ПРОЦЕНТ: [${data[hour].Percent}], ВЕС: [${data[hour].Weight}])`);
+            if (_DEBUG) debug.writelog(`saveHourlyPercent (СТАН: [${stan}], ЧАС: [${hour}], ПРОЦЕНТ: [${data[hour].Percent}], ВЕС: [${data[hour].Weight}])`);
             
             switch (stan) {
                 case 's350' : {
@@ -515,6 +378,9 @@ const Model = {
     putHour: async function(stan, hour, percent=0, weight=0, local=false) {
         // 1. Получаем сохраненное ранее состояние бригады
         let data = await this.readHourlyPercent(stan, local); // После очистки почасового плана приходит пустой объект в data, где нет полей 'Percent' и 'Weight'
+        if (!data) {
+            return false;
+        }
 
         if (!(hour in data)) { 
             // Если в data нет текущего часа, то создаем его
@@ -531,7 +397,7 @@ const Model = {
         };
         // Записываем состояние по часам в локальное хранилище
         await this.saveHourlyPercent(stan, data, local, hour);
-        // if (_DEBUG) debug.writelog(`Стан: ${stan}, час: ${hour}, процент: ${percent}, вес: ${weight}`);
+        if (_DEBUG) debug.writelog(`Стан: ${stan}, час: ${hour}, процент: ${percent}, вес: ${weight}`);
     },
 
     // Получение времени начала смены текущей бригады
@@ -571,7 +437,6 @@ const Model = {
 
     // Сохранение состояния текущей бригады
     saveShiftStat: async function(currBrigada) {
-        // let now = this.dateToString(new Date());
         let perc350 = 0;
         let perc210 = 0;
         let weig350 = 0;
@@ -594,11 +459,8 @@ const Model = {
         request.input('percent210', perc210);
         request.input('weight210', weig210);
         request.input('currBrigada', currBrigada);
-        // if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
-        let result = await request.query(s350Queries.updateBStats).catch(e => {return false}); 
-        if (result.rowsAffected.length) {
-            // brigades.setSaved(true);
-        }
+        if (_DEBUG) debug.writelog(`saveShiftStat(${currBrigada}) =>  (percent350: [${perc350}], weight350: [${weig350}], percent210: [${perc210}], weight210: [${weig210}])`);
+        await request.query(s350Queries.updateBStats).catch(e => { return false }); 
         return true;
     },
 
@@ -621,91 +483,27 @@ const Model = {
             brigades.setReseted(reseted);
 
             // Расчитать и сохранить производственные показатели бригады за смену
-            await this.saveShiftStat(currBrig.ID);
+            await this.saveShiftStat(currBrig.ID); 
         } else {
-            // Если номер текущей бригады не равен номеру предыдущей бригады (смена бригады)
-            // Сохранить состояние предыдущей бригады
-            await this.saveShiftStat(lastBrig);
-
-            // Сбросить почасовые показатели
+            // Заступила новая бригада, нужно обнулить почасовые показатели
             reseted = await this.resetHourlyStats(toLocal);
             brigades.setReseted(reseted);
 
             // Сохранить номер текущей бригады как предыдущей
-            lastBrig = currBrig;
+            lastBrig = currBrig.ID;
             brigades.setLastBrigade(currBrig.ID);
         }
         
     },
 
-
-    // Определяем номер бригады, которая должна заступить на смену
-    getSelectedBrigade: async function(pool, local) {
-
-        // Проверяем время
-        let currBrig = await brigades.getCurrentBrigade(pool);    // Номер текущей бригады и время начала ее смены
-        let brigDate = currBrig.BDate;
-        brigDate = new Date(brigDate = brigDate.setHours(brigDate.getUTCHours()));
-        let activeBrig = await brigades.getActiveBrigade(pool);   // Номер активной бригады
-        // let saved = brigades.isSaved();                 // Флаг сохранения текущей бригады;
-        const today = new Date();                       // Текущее время
-
-        // Если время работы бригады менее 1 минуты и состояние не сохранено, то сохраняем и устанавливаем флаг сохранения бригады
-        if ( (Number(today) - Number(currBrig.BDate) <= 60000 /* && !saved */ ) ) {
-            // Бригада работает менее минуты и статус не сохранен
-            //FIXME: Постоянно попадает saved == true, нужно считать только те часы,
-            // которые уже прошли, а не все часы смены, тогда не нужно делать обнуление
-            let shift;
-            if (today.getHours() == 8) {
-                shift = "Day";
-            } else {
-                shift = "Night";
-            }
-            let prevBrig = brigades.getPrevBrigade(currBrig.ID, shift);
-            let isSaved = await this.saveShiftStat(prevBrig);
-            // Если сохранен статус, то обнулить почасовую статистику, иначе выдать ошибку
-            if (isSaved) {
-                if (_DEBUG) {
-                    debug.writelog(`getSelectedBrigade() => Состояние бригады: [${isSaved}], запуск процедуры сброса почасового состояния \n`);
-                    
-                }
-                // Обнуляем почасовую статистику
-                let reseted = brigades.getReseted();
-                if (!reseted) {
-                    let reset = await this.resetHourlyStats(local); // Не отработало обнуление
-                    if (reset) {                                    // Неправильно считается показатель производства с начала месяца по бригадам
-                        console.log('Hourly stats was been reseted!');
-                    };
-                }
-            } else {
-                console.log("Error saving current brigade state.");
-            };
-        }
-        if ( (Number(today) - Number(currBrig.BDate) > 1200000) ) {
-            // brigades.setSaved(false);
-            brigades.setReseted(false);
-        }
-
-        // Сохраняем производственные показатели текущей бригады
-        // if (_DEBUG) debug.writelog(`getSelectedBrigade() =>  Активная бригада: [${activeBrig}], Текущая бригада: [${currBrig.ID}]`);
-        await this.saveShiftStat(currBrig.ID);
-        return activeBrig;
-    },
-
     // Расчитывем средний процент за день
     getDailyPercent: async function(stan) {
-        //FIXME: Если не получится вариант обойтись без флага сохранения бригады,
-        // то расчитывать дневной процент только по часам, которые уже прошли и текущему часу (currHour <= hour <= startHour)
-        let perc = 0;
-        let weight =0;
         const timeShift = {
             "Day": ['8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'],
             "Night": ['20', '21', '22', '23', '0', '1', '2', '3', '4', '5', '6', '7', '8']
         };
         let curr = [];
-        const today = new Date();
-        const currHour = today.getHours();
-        let hours = 0;
+        let table = '';
 
         await this.calcPercent(stan, toLocal); // Заполняем данные по часам
 
@@ -720,19 +518,17 @@ const Model = {
             // Заступила ночная смена, устанавливаем часы ночной смены
             curr = timeShift.Night;
         }
-
-        let daily = await this.readHourlyPercent(stan, toLocal);
-
-        for (day in daily) {  // Изменить расчет : считать только до текущего часа
-            if (curr.includes(day) && Number(day) <= currHour) {
-                perc += daily[day].Percent;
-                weight += daily[day].Weight;
-                hours++;
-            }
+        switch (stan) {
+            case 's350' : table = "Hourly350"; break;
+            case 's210' : table = "Hourly210"; break;
         }
-        perc = Math.round(perc / hours);
-        data['Percent'] = perc;
-        data['Weight'] = weight;
+        const query = `SELECT Count([Hour]) AS [Hours], AVG([Percent]) AS [Percent], SUM([Weight]) AS [Weight] FROM [L2Mill].[dbo].[${table}] WHERE [Hour] IN (${curr});`;
+        let request = s350.request();
+        let result = await request.query(query).catch(e => console.log(e));
+
+        data['Percent'] = result.recordset[0].Percent;
+        data['Weight'] = result.recordset[0].Weight;
+
         return data;
     },
 
@@ -754,9 +550,12 @@ const Model = {
         }
         // Получаем плановые показатели 
         plan = await this.getProdPlan(stan).catch(e => console.log(e));
+        if (!fact) {
+            return false;
+        }
 
         let avg = 0;
-        // TODO: Проход по строкам набора fact, выбор наименования профиля, поиск в таблице плана данный профиль и получение плана
+        // Проход по строкам набора fact, выбор наименования профиля, поиск в таблице плана данный профиль и получение плана
         if (stan == "s350") {
             // Для стана 350
             var profile = '';
@@ -823,8 +622,6 @@ const Model = {
                 };
                 if (plan_weight == 0) {
                     // Нет такого профиля в плане
-                    // let now = this.dateToString(new Date());
-                    // console.log('%s: Current profile [%s] was not founded in plan table!', now, profileName);
                     return false;
                 }
                 // Заполнили плановый вес
@@ -975,8 +772,7 @@ const Model = {
     },
 
     getProdList: async function(stan, start, finish) {
-        //FIXME: Нет стана 210
-        // TODO: Для каждой строки определить:
+        // Для каждой строки определить:
         // 1) Время начала проката, 
         // 2) Выделить начало часа, в котором катался профиль
         // 3) Определить долю часа в процентах, 
@@ -1066,8 +862,8 @@ const Model = {
                 let hour = '';
                 let hours = [];
                 let rw = {};
+
                 // Рассчитываем время фактического проката профиля в течение часа
-                // FIXME: Проверить работу при попадании немеры - длина пореза ND
                 for (let w=0; w<len; ++w) {
                     if (profile == 0 && length == 0) {
                         // Первый прокат в этом часе
