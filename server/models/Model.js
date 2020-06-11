@@ -797,7 +797,18 @@ const Model = {
                 row = {};
                 Data = listResult.recordset[r].DataWeight;
                 Profile = listResult.recordset[r].Size;
-                Length = listResult.recordset[r].Length;
+
+                // Отлавливаем "немеру", у которой не указана длина пореза (Length = 'ND')
+                if (listResult.recordset[r].Length === 'ND') {
+                    if (r > 0) {
+                        Length = listResult.recordset[r-1].Length;
+                    } else {
+                        Length = listResult.recordset[r+1].Length;
+                    }
+                } else {
+                    Length = listResult.recordset[r].Length;
+                }
+
                 Weight = listResult.recordset[r].Weight;
                 if (Data < start) break;
 
