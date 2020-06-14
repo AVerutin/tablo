@@ -227,8 +227,8 @@
                     stan.delay_timer = this.formatDate(new Date(Math.abs(stan.delay_planned_time - delay)), {showDate: false, utc: true});
                     console.log(stan.delay_timer);
                 } else {
-                    stan.delay_timer = "00:00:00";
-                    console.log(stan.delay_timer);
+                    // stan.delay_timer = "00:00:00";
+                    // console.log(stan.delay_timer);
                 }
             },
             async getData () {
@@ -256,6 +256,8 @@
                     this.s210.delay_planned_input = this.formatDate(new Date(response.data.s210.delay_planned_time), {utc: true, showDate: false, showSeconds:  false});
                     this.s350.delay_planned_time = response.data.s350.delay_planned_time;
                     this.s350.delay_planned_input = this.formatDate(new Date(response.data.s350.delay_planned_time), {utc: true, showDate: false, showSeconds:  false});
+                    if (this.s210.delay_planned_time == 0 ) this.s210.delay_planned_input = '00:00';
+                    if (this.s350.delay_planned_time == 0 ) this.s350.delay_planned_input = '00:00';
                 });
             },
             async setPlannedDelays() {
