@@ -51,7 +51,7 @@
                     <td :class="{curr_brigade:(current_brigade ===4)}">{{ s350.plan_perc[4] }}</td>
                 </tr>
                 <tr v-if="s350.working">
-                    <td class="tab_header">пр-во с нач. мес.</td>
+                    <td class="tab_header">Пр-во с нач. мес.</td>
                     <td :class="{curr_brigade:(current_brigade ===1)}">{{ s350.dev_month[1] }}</td>
                     <td :class="{curr_brigade:(current_brigade ===2)}">{{ s350.dev_month[2] }}</td>
                     <td :class="{curr_brigade:(current_brigade ===3)}">{{ s350.dev_month[3] }}</td>
@@ -89,7 +89,7 @@
                     <td :class="{curr_brigade:(current_brigade ===4)}">{{ s210.plan_perc[4] }}</td>
                 </tr>
                 <tr v-if="s210.working">
-                    <td class="tab_header">пр-во с нач. мес.</td>
+                    <td class="tab_header">Пр-во с нач. мес.</td>
                     <td :class="{curr_brigade:(current_brigade ===1)}">{{ s210.dev_month[1] }}</td>
                     <td :class="{curr_brigade:(current_brigade ===2)}">{{ s210.dev_month[2] }}</td>
                     <td :class="{curr_brigade:(current_brigade ===3)}">{{ s210.dev_month[3] }}</td>
@@ -111,123 +111,6 @@
                 <button class="btn btn-success" @click="setPlannedDelays">Сохранить</button>
             </form>
         </div>
-        <div class="container">
-            <h1>Планирование производства</h1>
-            <div class="row">
-                <b-calendar class="col-3" selected-variant="success" today-variant="info" v-model="dev_plan.plan_date" @selected="getDevPlan"></b-calendar>
-                <div class="col-9">
-                    <div class="row">
-                        <div class="col-10">
-                            <span v-if="loginError === true && !auth" class="text-danger">Не верный пароль</span>
-                            <input v-on:submit="login" id="pass_input" class="form-control" v-if="!auth" required v-model="pass" type="password" placeholder="Пароль для редактирования"/>
-                        </div>
-                        <button v-on:click="login" class="btn btn-success col-2" type="submit">{{ auth ? "Выход" : "Вход" }}</button>
-                    </div>
-                    <br/>
-                    <table class="table-active dev-plan">
-                        <thead class="thead-light">
-                        <tr>
-                            <th></th>
-                            <th>00:00</th>
-                            <th>01:00</th>
-                            <th>02:00</th>
-                            <th>03:00</th>
-                            <th>04:00</th>
-                            <th>05:00</th>
-                            <th>06:00</th>
-                            <th>07:00</th>
-                            <th>08:00</th>
-                            <th>09:00</th>
-                            <th>10:00</th>
-                            <th>11:00</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        <tr>
-                            <td>Стан 350</td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[0]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[1]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[2]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[3]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[4]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[5]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[6]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[7]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[8]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[9]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[10]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[11]"></td>
-                        </tr>
-                        <tr>
-                            <td>Стан 210</td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[0]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[1]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[2]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[3]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[4]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[5]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[6]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[7]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[8]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[9]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[10]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[11]"></td>
-                        </tr>
-                        <tr class="thead-light">
-                            <th></th>
-                            <th>12:00</th>
-                            <th>13:00</th>
-                            <th>14:00</th>
-                            <th>15:00</th>
-                            <th>16:00</th>
-                            <th>17:00</th>
-                            <th>18:00</th>
-                            <th>19:00</th>
-                            <th>20:00</th>
-                            <th>21:00</th>
-                            <th>22:00</th>
-                            <th>23:00</th>
-
-                        </tr>
-                        <tr>
-                            <td>Стан 350</td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[12]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[13]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[14]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[15]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[16]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[17]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[18]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[19]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[20]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[21]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[22]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s350[23]"></td>
-
-                        </tr>
-                        <tr>
-                            <td>Стан 210</td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[12]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[13]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[14]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[15]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[16]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[17]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[18]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[19]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[20]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[21]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[22]"></td>
-                            <td><input type="number" :disabled="!auth" min=0 v-model="dev_plan.s210[23]"></td>
-                        </tr>
-                        </tbody>
-                    </table>
-                    <br/>
-                    <div v-if="auth">
-                        <button class="btn btn-success " v-on:click="setDevPlan">Принять</button>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 </template>
@@ -367,6 +250,8 @@
                     url: process.env.VUE_APP_SERVER_URL + '/api/plannedDelays',
                     method: 'get',
                 }).then(response => {
+                    // delay_planned_time - время для счетчика (которое изменяется)
+                    // delay_planned_input - время для отображения на веб-форме
                     this.s210.delay_planned_time = response.data.s210.delay_planned_time; // delay_planned_time - Плановое время остановки в милисекундах
                     this.s210.delay_planned_input = this.formatDate(new Date(response.data.s210.delay_planned_time), {utc: true, showDate: false, showSeconds:  false});
                     this.s350.delay_planned_time = response.data.s350.delay_planned_time;

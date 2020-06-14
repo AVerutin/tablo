@@ -5,9 +5,10 @@ const config = require('config');
 const store = require('data-store')({ path: process.cwd() + '/delay_plan.json' });
 const hourlyStore = require('data-store')( {path: process.cwd() + '/hourly.json' } );
 const debug = require("./debug_log");
+const delays = require('./delays');
 
 const _DEBUG = false;
-const toLocal = false;
+const toLocal = true;
 
 let s350Queries = {
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
@@ -224,7 +225,7 @@ const Model = {
             let resultCurDelay = await request.query(queries.getCurDelay); // Получение данных о текущей остановке стана
             
             // Расчет по текущей остановке стана
-            let oldValues = this.getDelayPlan(stan) || { working: false, delay_planned_time: 0};
+            let oldValues = this.getDelayPlan(stan) || { working: false, delay_planned_time: 0 };
             if (resultCurDelay.recordset.length > 0) {
                 stats.working = false;
                 stats.delay_start_time = new Date(resultCurDelay.recordset[0].delayStart - 10800000);
@@ -232,6 +233,8 @@ const Model = {
             } else {
                 stats.working = true;
                 if (oldValues.working === false) {
+                    // Обнулить значение предыдущего планового простоя
+                    stats.delay_start_time = new Date(0);
                     oldValues.working = true;
                     oldValues.delay_planned_time = 0;
                     this.setDelayPlan(stan, oldValues);
@@ -535,6 +538,116 @@ const Model = {
         return data;
     },
 
+    // Получение текущего простоя
+    getCurrDelay: async function(stan) {
+        // Возвращаем продолжительность текущей остановки в миллисекундах и время начала текущей остановки
+        // или false - если стан едет
+        let data = {};
+        let request;
+        let query;
+
+        // Получаем время начала текущего простоя
+        if (stan == 's350') {
+            request = s350.request();
+            query = s350Queries.getCurDelay;
+        } else {
+            request = s210.request();
+            query = s210Queries.getCurDelay;
+        }
+
+        // Получаем текущую остановку стана
+        result = await request.query(query);
+        if (result.recordset.length > 0) {
+            // Стан стоит, рассчитаем продолжительность остановки
+            let today = new Date();
+            let delay = Number(result.recordset[0].delayStart) - 10800000;
+
+            data['duration'] = Number(today) - delay;
+            data['delayStart'] = new Date(delay);
+
+        } else {
+            // Стан едет
+            data = false;
+        }
+
+        return data;
+    },
+
+    getNonPlanDelay: async function(stan) {
+        // Получаем ранее сохраненное значение внепланового простоя
+        // и данные о текущем простое (currDelay ? {'duration':0, 'delayStart': 'y-m-d hh-mm-ss'} : false)
+        let result = 0;
+        let currDelay = await this.getCurrDelay(stan);  // Текущий простой
+        let planDelay = this.getDelayPlan(stan);        // Плановый простой
+        let today = new Date();
+
+        if (!currDelay) {
+            // Получить флаг предыдущего состояния стана
+            let stopped = delays.getStopped(stan);
+            // Если до этого был простой,
+            if (stopped === delays.Stopped) {
+                // то обнулить значение планового простоя
+                this.setDelayPlan(stan, { working: false, delay_planned_time: 0 });
+                delays.setStopped(stan, delays.Working);
+            };
+
+            if ( (today.getMinutes() == 0) && (today.getSeconds() <= 10) ) {
+                // Если текущее время - начало часа, обнулить ранее сохраненное значение внепланового простоя
+                delays.setDelayDuration(stan, 0);
+                result = 0;
+            }
+            return result;
+        } else {
+            // установим признак остановки стана
+            delays.setStopped(stan, delays.Stopped);
+
+            // Простой начался в прошлом часу?
+            let delayStartHour = currDelay.delayStart.getHours();
+            let currHour = today.getHours();
+            if (currHour - delayStartHour == 1) {
+                // считаем, сколько по времени стояли в прошлом часу
+                let startHour = new Date();
+                startHour.setMinutes(0);
+                startHour.setSeconds(0);
+                startHour.setMilliseconds(0);
+
+                // Получаем продолжительность простоя за прошлый час
+                let lastHour = Number(startHour) - Number(currDelay.delayStart);
+                tmpPlan = planDelay.delay_planned_time - lastHour;
+                tmpCurr = currDelay.duration - lastHour;
+                
+                // Если продолжтельность текущего простоя больше плановой
+                if (tmpCurr > tmpPlan) {
+                    // Очищаем сохраненное ранее значение, т.к. оно содержит данные за прошлы час
+                    delays.setDelayDuration(stan, 0);
+                    let nonPlan = tmpCurr - tmpPlan;
+                    delays.addDelayDuration(stan, nonPlan, delays.AdditiveValue);
+                    result = nonPlan;
+                } else {
+                    // Стоим в пределах плановой продолжительности
+                    // Очищаем сохраненное значение от данных прошлого часа
+                    delays.setDelayDuration(stan, 0);
+                    result = 0;
+                }
+            } else {
+                // Простой начался в этом часе
+                if (currDelay > planDelay.delay_planned_time) {
+                    // Стоим дольше, чем планировали
+                    // Сохраним текущий простой, как внеплановый
+                let nonPlan = currDelay - planDelay.delay_planned_time;
+                    delays.addDelayDuration(stan, nonPlan, delays.AdditiveValue);
+                    result = delays.getDelayDuration(stan);
+                } else {
+                    // Стоим в пределах планового простоя, если до этого стояли сверх плана,
+                    // то возвращаем ранее сохраненное значение
+                    result = delays.getDelayDuration(stan);
+                }
+            }
+        };
+
+        return result;
+    },
+
     // Расчет процента выполнения плана за текущий час
     // и сохранение текущего часа в локальном хранилище или БД
     calcPercent: async function (stan, local){
@@ -547,17 +660,42 @@ const Model = {
 
         var hour = finish.getUTCHours(); 
         // Получаем фактически произведенную продукцию за период
-        fact = await this.getHourlyProd(stan, start, finish).catch(e => console.log(e));
+        let fact = await this.getHourlyProd(stan, start, finish).catch(e => console.log(e));
         if (!fact) {
             return false;
         }
         // Получаем плановые показатели 
-        plan = await this.getProdPlan(stan).catch(e => console.log(e));
+        let plan = await this.getProdPlan(stan).catch(e => console.log(e));
         if (!fact) {
             return false;
         }
 
+        // Получаем признак простоя в настоящий момент
+        // Если стан стоит, определяем время начала простоя
+        // Смотрим, плановый он, или нет (есть ли запись в простое)
+        // Если время планового простоя закончилось, то обнуляем значение планового простоя
+        // Смотрим, сколько длится текущий простой (текущее время минус время начала простоя)
+        // Если стоим больше, чем было по плану, то это - производственный (внеплановый простой)
+        // Обнуляем время планового простоя (this.setDelayPlan(stan, { working: false, delay_planned_time: 0 });
+        // Находим продолжительность простоя сверх плана (текущее время - время начала простоя - длительность планого простоя)
+        // Прибавляем продолжительность простоя сверх плана к времени проката текущего профиля
+
+        // Нужно сохранять между сессиями значение продолжительности неплановых простоев
+        // при очередном простое в самом начале нужно получить значение неплановых простоев,
+        // которые уже были в этом часу и время текущего внепланового простоя добавлять к этому значению
+        // Скорее всего такой способ не сработает, поэтому нужно каждый простой считать отдельно
+        
+        // Если простой 
+        // Таким же образом определяем, что он неплановый
+        // Точно также расчитываем продолжительность текущего простоя
+        // Считываем из файла продолжительность простоя, сохраненное в прошлый раз (для текущего часа)
+        // Находим разницу между текущей и предыдущей продолжительностями, 
+        // Прибавляем эту разницу к предыдущему значению и записываем в файл
+        // В начале каждого часа необходимо обнулять это значение
+        
+
         let avg = 0;
+        let nonPlanDelay = 0;
         // Проход по строкам набора fact, выбор наименования профиля, поиск в таблице плана данный профиль и получение плана
         if (stan == "s350") {
             // Для стана 350
@@ -583,6 +721,11 @@ const Model = {
                 }
 
                 // Расчитаем, какую часть часа был фактический прокат
+                // К общему времени проката добавляем время производственного (внепланового) простоя
+
+                // Учитываем время внепланового простоя, если он был
+                nonPlanDelay = await this.getNonPlanDelay(stan);
+                finish = new Date( Number(finish) + nonPlanDelay );
                 hourPercent = this.calcHourPart(start, finish);       // сколько процентов в текущем часе работали
                 hourPlan = (plan_weight * hourPercent) / 100;         // Сколько тонн должны были прокатать за это время 
                 perc = (real_weight * 100) / hourPlan;                // При простое деление на 0!
@@ -627,7 +770,9 @@ const Model = {
                     // Нет такого профиля в плане
                     return false;
                 }
-                // Заполнили плановый вес
+                // Учитываем время внепланового простоя, если он был
+                nonPlanDelay = await this.getNonPlanDelay(stan);
+                finish = new Date( Number(finish) + nonPlanDelay );
                 hourPercent = this.calcHourPart(start, finish);       // сколько процентов в текущем часе работали
                 hourPlan = (plan_weight * hourPercent) / 100;         // Сколько тонн должны были прокатать за это время 
                 perc = (real_weight * 100) / hourPlan;                // При простое деление на 0!
