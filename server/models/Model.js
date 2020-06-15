@@ -110,6 +110,15 @@ let s210Queries = {
         "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND " +
         "[ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] BETWEEN @startTs AND @finishTs " +
         "ORDER BY [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] ASC;",
+    // prodList: "SELECT [RML_COIL].[COIL_WGT] AS [Weight], [RML_COIL].[WEIGHING_DATE] AS [Rolling_Date], [RML_PRODUCT_TYPE].[PROFILE_ID] AS [Profile_ID],\n" +
+    //     "[RML_PRODUCT_TYPE].[PRODUCT_TYPE_HIPROF] AS [Profile_Name] FROM [ABINSK_RMRT].[dbo].[RML_COIL], [ABINSK_RMRT].[dbo].[RML_PROGRAM],\n" +
+    //     "[ABINSK_RMRT].[dbo].[RML_JOB], [ABINSK_RMRT].[dbo].[RML_CATALOG], [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE]\n" +
+    //     "WHERE [ABINSK_RMRT].[dbo].[RML_COIL].[PROGRAM_ID] = [ABINSK_RMRT].[dbo].[RML_PROGRAM].[PROGRAM_ID] AND\n" +
+    //     "[ABINSK_RMRT].[dbo].[RML_PROGRAM].[JOB_ID] = [ABINSK_RMRT].[dbo].[RML_JOB].[JOB_ID] AND\n" +
+    //     "[ABINSK_RMRT].[dbo].[RML_JOB].[CATALOG_ID] = [ABINSK_RMRT].[dbo].[RML_CATALOG].[CATALOG_ID] AND\n" +
+    //     "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND\n" +
+    //     "[ABINSK_RMRT].[dbo].[RML_COIL].[WEIGHING_DATE] BETWEEN @startTs AND @finishTs\n" +
+    //     "ORDER BY [ABINSK_RMRT].[dbo].[RML_COIL].[WEIGHING_DATE] ASC;\n",
     delayQuery: "SELECT [START_DELAY] as start\n" +
         ",[END_DELAY] as finish\n" +
         "\n" +
@@ -631,10 +640,10 @@ const Model = {
                 }
             } else {
                 // Простой начался в этом часе
-                if (currDelay > planDelay.delay_planned_time) {
+                if (currDelay.duration > planDelay.delay_planned_time) {
                     // Стоим дольше, чем планировали
                     // Сохраним текущий простой, как внеплановый
-                let nonPlan = currDelay - planDelay.delay_planned_time;
+                let nonPlan = currDelay.duration - planDelay.delay_planned_time;
                     delays.addDelayDuration(stan, nonPlan, delays.AdditiveValue);
                     result = delays.getDelayDuration(stan);
                 } else {
