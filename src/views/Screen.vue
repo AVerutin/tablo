@@ -106,13 +106,13 @@
                 </div>
                 <div class="form-group row">
                     <label class="col-9"  for="s350.delay_planned_number">Время планируемого простоя стан 210: </label>
-                    <input class="form-control col-3"   type="time" id="s210.delay_planned_number" v-model.lazy="s210.delay_planned_input">
+                    <input class="form-control col-3" type="time" id="s210.delay_planned_number" v-model.lazy="s210.delay_planned_input">
                 </div>
                 <button class="btn btn-success" @click="setPlannedDelays">Сохранить</button>
             </form>
         </div>
         </div>
-    </div>
+    <!-- </div> -->
 </template>
 
 <script>
@@ -131,6 +131,8 @@
                     delay_planned_time: '',
                     start_month: 0,
                     start_year: 0,
+                    name: 's350',
+                    need_reset_timer: false,
                 },
                 s210: {
                     dev_shift: [0, 0, 0, 0, 0],
@@ -144,6 +146,8 @@
                     delay_timer: '',
                     start_month: 0,
                     start_year: 0,
+                    name: 's210',
+                    need_reset_timer: false,
                 },
                 current_brigade: 0,
                 temp_in: 0,
@@ -175,7 +179,7 @@
                         this.updateDelay(this.s350);
                         this.updateDelay(this.s210);
                     }, 1000);
-                }
+                } 
 
                  //GetData
                  // Таймер каждые 5 сек при неактивном простое
@@ -184,6 +188,15 @@
                     this._getDataTimer = setInterval(() => {
                         this.getData();
                     }, 5000);
+                    if (this.s350.need_reset_timer) {
+                        this.s350.delay_planned_input = "00:00";
+                        document.location.reload();
+                    } else {
+                        if (this.s210.need_reset_timer) {
+                            this.s210.delay_planned_input = "00:00";
+                            document.location.reload();
+                        }
+                    }
                 }
             },
             formatDate: function (date, options = {}) {
@@ -225,10 +238,12 @@
                     delay = (new Date - new Date(stan.delay_start_time)); // Вычисляем время окончания плановой остановки
                     stan.delay_planned = stan.delay_planned_time > delay; // Если время окончания остановки больше, то останов плановый
                     stan.delay_timer = this.formatDate(new Date(Math.abs(stan.delay_planned_time - delay)), {showDate: false, utc: true});
-                    console.log(stan.delay_timer);
+                    if (stan.need_reset_timer) {
+                        stan.delay_planned_input = "00:00";
+                        // document.location.reload();
+                    }
                 } else {
-                    // stan.delay_timer = "00:00:00";
-                    // console.log(stan.delay_timer);
+                        // stan.delay_planned_input = "00:00";
                 }
             },
             async getData () {
@@ -284,9 +299,6 @@
                     this.s350.delay_planned_time = response.data.s350.delay_planned_time;
                     this.s350.delay_planned_input = this.formatDate(new Date(response.data.s350.delay_planned_time), {utc: true, showDate: false, showSeconds:  false});
                 });
-                // Обнуление значения планового простоя после его завершения
-                // s350.delay_planned_input = 0;
-                // s210.delay_planned_input = 0;
             },
             async login(e) {
                 e.preventDefault();
@@ -311,16 +323,16 @@
                 }
 
             },
-            // TEST MY API
-            async getProfiles() {
-                await this.$http({
-                    url: process.env.VUE_APP_SERVER_URL + '/api/getProfiles',
-                    method: 'get',
-                }).then(responce => {
-                    console.log(response.hourBegin);
-                });
-            },
-            // TEST MY API
+            // // TEST MY API
+            // async getProfiles() {
+            //     await this.$http({
+            //         url: process.env.VUE_APP_SERVER_URL + '/api/getProfiles',
+            //         method: 'get',
+            //     }).then(responce => {
+            //         console.log(response.hourBegin);
+            //     });
+            // },
+            // // TEST MY API
             async setDevPlan() {
                 await this.$http({
                     url: process.env.VUE_APP_SERVER_URL + '/api/dev_plan',
@@ -352,7 +364,6 @@
             this.getPlannedDelays();
             this.getData();
             this.getDevPlan();
-            this.getProfiles();
             this.show();
         }
     }

@@ -8,7 +8,7 @@ const debug = require("./debug_log");
 const delays = require('./delays');
 
 const _DEBUG = false;
-const toLocal = true;
+const toLocal = false;
 
 let s350Queries = {
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
@@ -101,24 +101,24 @@ let s210Queries = {
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
     getHourStats: "SELECT [Hour], [Percent], [Weight] FROM [L2Mill].[dbo].[Hourly210] ORDER BY [Hour];",
     resetHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = 100, [Weight] = 0;",
-    prodList: "SELECT [RML_SEMIPRODUCT].[SEMIPRODUCT_WGT] AS [Weight], [RML_SEMIPRODUCT].[ROLLING_DATE] AS [Rolling_Date], " +
-        "[RML_PRODUCT_TYPE].[PROFILE_ID] AS [Profile_ID], [RML_PRODUCT_TYPE].[PRODUCT_TYPE_HIPROF] AS [Profile_Name] FROM [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT], " +
-        "[ABINSK_RMRT].[dbo].[RML_PROGRAM], [ABINSK_RMRT].[dbo].[RML_JOB], [ABINSK_RMRT].[dbo].[RML_CATALOG], [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE] " +
-        "WHERE [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[PROGRAM_ID] = [ABINSK_RMRT].[dbo].[RML_PROGRAM].[PROGRAM_ID] AND " +
-        "[ABINSK_RMRT].[dbo].[RML_PROGRAM].[JOB_ID] = [ABINSK_RMRT].[dbo].[RML_JOB].[JOB_ID] AND " +
-        "[ABINSK_RMRT].[dbo].[RML_JOB].[CATALOG_ID] = [ABINSK_RMRT].[dbo].[RML_CATALOG].[CATALOG_ID] AND " +
-        "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND " +
-        "[ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] BETWEEN @startTs AND @finishTs " +
-        "ORDER BY [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] ASC;",
-    // prodList: "SELECT [RML_COIL].[COIL_WGT] AS [Weight], [RML_COIL].[WEIGHING_DATE] AS [Rolling_Date], [RML_PRODUCT_TYPE].[PROFILE_ID] AS [Profile_ID],\n" +
-    //     "[RML_PRODUCT_TYPE].[PRODUCT_TYPE_HIPROF] AS [Profile_Name] FROM [ABINSK_RMRT].[dbo].[RML_COIL], [ABINSK_RMRT].[dbo].[RML_PROGRAM],\n" +
-    //     "[ABINSK_RMRT].[dbo].[RML_JOB], [ABINSK_RMRT].[dbo].[RML_CATALOG], [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE]\n" +
-    //     "WHERE [ABINSK_RMRT].[dbo].[RML_COIL].[PROGRAM_ID] = [ABINSK_RMRT].[dbo].[RML_PROGRAM].[PROGRAM_ID] AND\n" +
-    //     "[ABINSK_RMRT].[dbo].[RML_PROGRAM].[JOB_ID] = [ABINSK_RMRT].[dbo].[RML_JOB].[JOB_ID] AND\n" +
-    //     "[ABINSK_RMRT].[dbo].[RML_JOB].[CATALOG_ID] = [ABINSK_RMRT].[dbo].[RML_CATALOG].[CATALOG_ID] AND\n" +
-    //     "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND\n" +
-    //     "[ABINSK_RMRT].[dbo].[RML_COIL].[WEIGHING_DATE] BETWEEN @startTs AND @finishTs\n" +
-    //     "ORDER BY [ABINSK_RMRT].[dbo].[RML_COIL].[WEIGHING_DATE] ASC;\n",
+    // prodList: "SELECT [RML_SEMIPRODUCT].[SEMIPRODUCT_WGT] AS [Weight], [RML_SEMIPRODUCT].[ROLLING_DATE] AS [Rolling_Date], " +
+    //     "[RML_PRODUCT_TYPE].[PROFILE_ID] AS [Profile_ID], [RML_PRODUCT_TYPE].[PRODUCT_TYPE_HIPROF] AS [Profile_Name] FROM [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT], " +
+    //     "[ABINSK_RMRT].[dbo].[RML_PROGRAM], [ABINSK_RMRT].[dbo].[RML_JOB], [ABINSK_RMRT].[dbo].[RML_CATALOG], [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE] " +
+    //     "WHERE [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[PROGRAM_ID] = [ABINSK_RMRT].[dbo].[RML_PROGRAM].[PROGRAM_ID] AND " +
+    //     "[ABINSK_RMRT].[dbo].[RML_PROGRAM].[JOB_ID] = [ABINSK_RMRT].[dbo].[RML_JOB].[JOB_ID] AND " +
+    //     "[ABINSK_RMRT].[dbo].[RML_JOB].[CATALOG_ID] = [ABINSK_RMRT].[dbo].[RML_CATALOG].[CATALOG_ID] AND " +
+    //     "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND " +
+    //     "[ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] BETWEEN @startTs AND @finishTs " +
+    //     "ORDER BY [ABINSK_RMRT].[dbo].[RML_SEMIPRODUCT].[ROLLING_DATE] ASC;",
+    prodList: "SELECT [RML_COIL].[COIL_WGT] AS [Weight], [RML_COIL].[WEIGHING_DATE] AS [Rolling_Date], [RML_PRODUCT_TYPE].[PROFILE_ID] AS [Profile_ID],\n" +
+        "[RML_PRODUCT_TYPE].[PRODUCT_TYPE_HIPROF] AS [Profile_Name] FROM [ABINSK_RMRT].[dbo].[RML_COIL], [ABINSK_RMRT].[dbo].[RML_PROGRAM],\n" +
+        "[ABINSK_RMRT].[dbo].[RML_JOB], [ABINSK_RMRT].[dbo].[RML_CATALOG], [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE]\n" +
+        "WHERE [ABINSK_RMRT].[dbo].[RML_COIL].[PROGRAM_ID] = [ABINSK_RMRT].[dbo].[RML_PROGRAM].[PROGRAM_ID] AND\n" +
+        "[ABINSK_RMRT].[dbo].[RML_PROGRAM].[JOB_ID] = [ABINSK_RMRT].[dbo].[RML_JOB].[JOB_ID] AND\n" +
+        "[ABINSK_RMRT].[dbo].[RML_JOB].[CATALOG_ID] = [ABINSK_RMRT].[dbo].[RML_CATALOG].[CATALOG_ID] AND\n" +
+        "[ABINSK_RMRT].[dbo].[RML_CATALOG].[PRODUCT_TYPE_ID] = [ABINSK_RMRT].[dbo].[RML_PRODUCT_TYPE].[PRODUCT_TYPE_ID] AND\n" +
+        "[ABINSK_RMRT].[dbo].[RML_COIL].[WEIGHING_DATE] BETWEEN @startTs AND @finishTs\n" +
+        "ORDER BY [ABINSK_RMRT].[dbo].[RML_COIL].[WEIGHING_DATE] ASC;\n",
     delayQuery: "SELECT [START_DELAY] as start\n" +
         ",[END_DELAY] as finish\n" +
         "\n" +
@@ -225,6 +225,7 @@ const Model = {
                 delay_start_time: '',
                 start_month: 0,
                 start_year: 0,
+                need_reset_timer: false,
             };
 
             // Получение данных о производственых показателях предыдущих бригад
@@ -247,6 +248,9 @@ const Model = {
                     oldValues.working = true;
                     oldValues.delay_planned_time = 0;
                     this.setDelayPlan(stan, oldValues);
+                    stats.need_reset_timer = true;
+                } else {
+                    stats.need_reset_timer = false;
                 }
             }
 
