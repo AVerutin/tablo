@@ -8,7 +8,7 @@ const debug = require("./debug_log");
 const delays = require('./delays');
 
 const _DEBUG = false;
-const toLocal = false;
+const toLocal = true;
 
 let s350Queries = {
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
@@ -226,6 +226,7 @@ const Model = {
                 start_month: 0,
                 start_year: 0,
                 need_reset_timer: false,
+                error: false,
             };
 
             // Получение данных о производственых показателях предыдущих бригад
@@ -233,6 +234,8 @@ const Model = {
             stats.start_year = Math.round(await this.getFromStartYear(stan, pool) / 1000.0); // Получение показателей по станам с начала года
             stats.start_month = Math.round(await this.getFromStartMonth(stan, pool) / 1000.0); // Получение показателей по станам с начала месяца
             let resultCurDelay = await request.query(queries.getCurDelay); // Получение данных о текущей остановке стана
+
+            let err = delays.getError(stan);
             
             // Расчет по текущей остановке стана
             let oldValues = this.getDelayPlan(stan) || { working: false, delay_planned_time: 0 };
@@ -251,6 +254,10 @@ const Model = {
                     stats.need_reset_timer = true;
                 } else {
                     stats.need_reset_timer = false;
+                }
+                if (err) {
+                    stats.working = false;
+                    stats.error = true;
                 }
             }
 
@@ -502,6 +509,10 @@ const Model = {
             await this.saveShiftStat(currBrig.ID); 
         } else {
             // Заступила новая бригада, нужно обнулить почасовые показатели
+            // Сохранить время начала текущей бригады в БД
+            let brigDate = this.dateToString(currBrig.BDate);
+            // await brigades.saveShiftTime(s350, currBrig.ID, brigDate);
+
             reseted = await this.resetHourlyStats(toLocal);
             brigades.setReseted(reseted);
 
@@ -509,7 +520,6 @@ const Model = {
             lastBrig = currBrig.ID;
             brigades.setLastBrigade(currBrig.ID);
         }
-        
     },
 
     // Расчитывем средний процент за день
@@ -765,6 +775,7 @@ const Model = {
                     // Ищем по полю fact.ProfileID
                     if (plan[i].ProfileName == profileID) {
                         // Нашли
+                        delays.setError(stan, false);
                         plan_weight = plan[i].Plan;
                         break;
                     };
@@ -774,6 +785,7 @@ const Model = {
                     for (let i = 0; i < plan.length; ++i) {
                         if (plan[i].ProfileName == profileName) {
                             // Нашли
+                            delay.setError(stan, false);
                             plan_weight = plan[i].Plan;
                             break;
                         }
@@ -781,7 +793,8 @@ const Model = {
                 };
                 if (plan_weight == 0) {
                     // Нет такого профиля в плане
-                    plan_weight = 112; // Если указан несуществующий профиль, то ставим средний план по всем профилям
+                    delays.setError(stan, true);
+                    // plan_weight = 112; // Если указан несуществующий профиль, то ставим средний план по всем профилям
                 }
                 // Учитываем время внепланового простоя, если он был
                 nonPlanDelay = await this.getNonPlanDelay(stan);

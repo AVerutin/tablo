@@ -62,11 +62,17 @@
                     <th colspan="2" class="stan" :class="{working:s210.working}">М: {{ s210.start_month }}</th>
                     <th colspan="2" class="stan" :class="{working:s210.working}">Г: {{ s210.start_year }}</th>
                 </tr>
-                <tr class="delay" v-if="(s210.working === false)">
+                <tr class="delay" v-if="(s210.working === false) && (s210.error !== true)">
                     <td class="planned_delay" v-if="s210.delay_planned">Плановый простой (Обратный отсчет)</td>
                     <td v-else>Не плановый простой</td>
                     <td colspan="4" :class="{planned_delay:(s210.delay_planned)}" class="timer">{{ s210.delay_timer }}</td>
                 </tr>
+<!--                    -->
+                <tr class="delay" v-if="(s210.error === true)">
+                    <td class="error">ВНИМАНИЕ!</td>
+                    <td colspan="4" class="error_line">НЕВЕРНО УКАЗАН ПРОФИЛЬ</td>
+                </tr>
+<!--                    -->
                 <tr v-if="s210.working">
                     <td class="tab_header">Пр-во за смену (т)</td>
                     <td :class="{curr_brigade:(current_brigade ===1)}"> {{ s210.dev_shift[1] }}</td>
@@ -133,6 +139,7 @@
                     start_year: 0,
                     name: 's350',
                     need_reset_timer: false,
+                    error: false,
                 },
                 s210: {
                     dev_shift: [0, 0, 0, 0, 0],
@@ -148,6 +155,7 @@
                     start_year: 0,
                     name: 's210',
                     need_reset_timer: false,
+                    error: false,
                 },
                 current_brigade: 0,
                 temp_in: 0,
@@ -382,11 +390,18 @@
         line-height: 12px;
     }
 
-    .delay{
+    .delay {
         height: 60px;
         vertical-align: middle;
         text-align: center;
         font-size: 14px;
+    }
+
+    .error {
+        height: 60px;
+        vertical-align: middle;
+        text-align: center;
+        font-size: 18px;
     }
 
     table, td, th {
@@ -442,6 +457,12 @@
         font-size: 33px;
         font-weight: bold;
         color: #fff;
+    }
+
+    .delay .error {
+        font-size: 18px;
+        font-weight: normal;
+        color: #000;
     }
 
     th.tab_header{

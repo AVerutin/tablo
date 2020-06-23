@@ -61,6 +61,30 @@ const Delays = {
         local.set(stan, value);
     },
 
+    getError: function(stan) {
+        let value = local.get(stan);
+        if (!value) {
+            value = {};
+            value.Error = false;
+            local.set(stan, value);
+        }
+        if (!value.Error) {
+            value.Error = false;
+            local.set(stan, value);
+        }
+
+        return value.Error;
+    },
+
+     setError: function(stan, error) {
+        let value = local.get(stan);
+        if (!value) {
+            value = {};
+        }
+        value.Error = error;
+        local.set(stan, value);
+     },
+
     addDelayDuration: function(stan, duration, valueType) {
         // Увеличение продолжительности простоя на указанную величину
         // В качестве параметра функция принимает полную величину простоя и увеливает на разницу 

@@ -124,6 +124,32 @@ const Brigades = {
         return res;
     },
 
+    getShiftTime: function() {
+        return local.get('ShiftTime');
+    },
+
+    setShiftTime: function(shiftTime) {
+        local.set('ShiftTime', shiftTime);
+    },
+
+    saveShiftTime: async function(pool, BNum, BData) {
+        this.setShiftTime(BData);
+        const BNames = ['', 'Бригада №1', 'Бригада №2', 'Бригада №3', 'Бригада №4'];
+        const sqlQuery = "INSERT INTO [L2Mill].[dbo].[BrigadaShift] ([BNumber], [BName], [BDate]) VALUES (\n" +
+                "@bnum, '@bname', '@bdata');";
+        let request = pool.request();
+        request.input('bnum', BNum);
+        request.input('bname', BNames[BNum]);
+        request.input('bdata', BData);
+        try {
+            await request.query(sqlQuery);
+        } catch (err) {
+            console.log(err);
+        }
+    },
+
+    // setSh
+
     getNextBrigade: function(brig, shift) {
         // Получить номер следующей бригады, которая заступит на смену
         // brig - номер бригады, которая сейчас работает

@@ -1,10 +1,12 @@
 {
   "s350": {
     "Stopped": 4,
-    "Duration": 0
+    "Duration": 122466,
+    "Error": false
   },
   "s210": {
     "Stopped": 4,
-    "Duration": 425287
+    "Duration": 425287,
+    "Error": false
   }
 }
