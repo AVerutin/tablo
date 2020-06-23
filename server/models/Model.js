@@ -781,7 +781,7 @@ const Model = {
                 };
                 if (plan_weight == 0) {
                     // Нет такого профиля в плане
-                    return false;
+                    plan_weight = 112; // Если указан несуществующий профиль, то ставим средний план по всем профилям
                 }
                 // Учитываем время внепланового простоя, если он был
                 nonPlanDelay = await this.getNonPlanDelay(stan);

@@ -190,11 +190,11 @@
                     }, 5000);
                     if (this.s350.need_reset_timer) {
                         this.s350.delay_planned_input = "00:00";
-                        document.location.reload();
+                        // document.location.reload();
                     } else {
                         if (this.s210.need_reset_timer) {
                             this.s210.delay_planned_input = "00:00";
-                            document.location.reload();
+                            // document.location.reload();
                         }
                     }
                 }
