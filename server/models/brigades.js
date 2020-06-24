@@ -1,4 +1,5 @@
 const local = require('data-store')({ path: process.cwd() + '/brigs.json' });
+const sql = require('mssql');
 const brigadeQuery = "SELECT [ID], [BDate] FROM [L2Mill].[dbo].[Brigada] WHERE [BCur] > 0";
 
 const Brigades = {
@@ -136,7 +137,7 @@ const Brigades = {
         this.setShiftTime(BData);
         const BNames = ['', 'Бригада №1', 'Бригада №2', 'Бригада №3', 'Бригада №4'];
         const sqlQuery = "INSERT INTO [L2Mill].[dbo].[BrigadaShift] ([BNumber], [BName], [BDate]) VALUES (\n" +
-                "@bnum, '@bname', '@bdata');";
+                "@bnum, @bname, @bdata);";
         let request = pool.request();
         request.input('bnum', BNum);
         request.input('bname', BNames[BNum]);
@@ -144,7 +145,7 @@ const Brigades = {
         try {
             await request.query(sqlQuery);
         } catch (err) {
-            console.log(err);
+            console.log(err.message);
         }
     },
 
