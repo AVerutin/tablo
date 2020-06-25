@@ -135,12 +135,9 @@ const Brigades = {
 
     saveShiftTime: async function(pool, BNum, BData) {
         this.setShiftTime(BData);
-        const BNames = ['', 'Бригада №1', 'Бригада №2', 'Бригада №3', 'Бригада №4'];
-        const sqlQuery = "INSERT INTO [L2Mill].[dbo].[BrigadaShift] ([BNumber], [BName], [BDate]) VALUES (\n" +
-                "@bnum, @bname, @bdata);";
+        const sqlQuery = "INSERT INTO [L2Mill].[dbo].[BrigadaShift] ([BNumber], [BDate]) VALUES (@bnum, @bdata);";
         let request = pool.request();
         request.input('bnum', BNum);
-        request.input('bname', BNames[BNum]);
         request.input('bdata', BData);
         try {
             await request.query(sqlQuery);
