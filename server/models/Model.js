@@ -8,7 +8,7 @@ const debug = require("./debug_log");
 const delays = require('./delays');
 
 const _DEBUG = false;
-const toLocal = false;
+const toLocal = true;
 
 let s350Queries = {
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
@@ -512,8 +512,10 @@ const Model = {
             // Сохранить время начала текущей бригады в БД
 
             //FIXME: Отладить и добавить функцию сохранения времени начала смены
-            let brigDate = new Date(this.dateToString(currBrig.BDate));
-            await brigades.saveShiftTime(s350, currBrig.ID, brigDate);
+            // let bDat = new Date ( this.dateToString(currBrig.BDate));
+            // bDat = Number(bDat) + 10800000;
+            // let brigDate = new Date(this.dateToString(bDat));
+            await brigades.saveShiftTime(s350, currBrig.ID, currBrig.BDate);
 
             reseted = await this.resetHourlyStats(toLocal);
             brigades.setReseted(reseted);
