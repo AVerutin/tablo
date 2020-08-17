@@ -8,7 +8,7 @@ const debug = require("./debug_log");
 const delays = require('./delays');
 
 const _DEBUG = false;
-const toLocal = true;
+const toLocal = false;
 
 let s350Queries = {
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
@@ -95,7 +95,7 @@ let s350Queries = {
         " DROP TABLE #sheldule;",
     spcTemperature: "SELECT TOP (1) [tempspc]\n" +
         "  FROM [L2Mill].[dbo].[temperature]",
-};
+}
 
 let s210Queries = {
     setHourStats: "UPDATE [L2Mill].[dbo].[Hourly210] SET [Percent] = @hourPercent, [Weight] = @hourWeight WHERE [Hour] = @currentHour;",
@@ -189,7 +189,7 @@ const Model = {
             current_brigade: await brigades.getActiveBrigade(s350),
             spc_month: 0, // Прокатано по цеху с начала месяца
             spc_year: 0,  // Прокататно по цеху с начала года
-        };
+        }
         // Расчет показателей в целом по цеху
         result_data.spc_month = result_data.s350.start_month + result_data.s210.start_month;
         result_data.spc_year = result_data.s350.start_year + result_data.s210.start_year;
@@ -227,7 +227,7 @@ const Model = {
                 start_year: 0,
                 need_reset_timer: false,
                 error: false,
-            };
+            }
 
             // Получение данных о производственых показателях предыдущих бригад
             await this.calcBrigade(false);
@@ -379,7 +379,7 @@ const Model = {
             let request = s350.request();
             let result;
 
-            if (stan == 's350') {
+            if (stan === 's350') {
                 result = await request.query(s350Queries.getHourStats).catch(e =>console.log(e));
             } else {
                 result = await request.query(s210Queries.getHourStats).catch(e =>console.log(e));
@@ -417,7 +417,8 @@ const Model = {
         // 2. Изменяем значение текущего часа
             data[hour].Percent = percent;
             data[hour].Weight = weight;
-        };
+        }
+
         // Записываем состояние по часам в локальное хранилище
         await this.saveHourlyPercent(stan, data, local, hour);
         if (_DEBUG) debug.writelog(`Стан: ${stan}, час: ${hour}, процент: ${percent}, вес: ${weight}`);
@@ -443,7 +444,7 @@ const Model = {
         let numHour = Number(hour.getHours()); // Hour - строка, нет функции getHours();
         let shiftStart = await this.getShiftStart();
         let shiftHour = shiftStart.getHours();
-        if (shiftHour == numHour) {         // Работаем первый час
+        if (shiftHour === numHour) {         // Работаем первый час
             result = shiftStart;
         } else {
             result.setHours(numHour);
@@ -500,7 +501,7 @@ const Model = {
         let reseted = brigades.getReseted();
 
         // Если номер текущей бригады не равен номеру предыдущей бригады
-        if (currBrig.ID == lastBrig) {
+        if (currBrig.ID === lastBrig) {
             // Сбросить флаг "сброшено"
             reseted = false;
             brigades.setReseted(reseted);
@@ -531,7 +532,8 @@ const Model = {
         const timeShift = {
             "Day": ['8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20'],
             "Night": ['20', '21', '22', '23', '0', '1', '2', '3', '4', '5', '6', '7', '8']
-        };
+        }
+
         let curr = [];
         let table = '';
 
@@ -541,7 +543,7 @@ const Model = {
         let currentShift = await brigades.getCurrentBrigade(s350);
         let shiftStart = currentShift.BDate; 
         shiftStart = shiftStart.getUTCHours();
-        if (shiftStart == 8) {
+        if (shiftStart === 8) {
             // Заступила дневная смена, устанавливаем часы дневной смены
             curr = timeShift.Day;
         } else {
@@ -574,7 +576,7 @@ const Model = {
         let query;
 
         // Получаем время начала текущего простоя
-        if (stan == 's350') {
+        if (stan === 's350') {
             request = s350.request();
             query = s350Queries.getCurDelay;
         } else {
@@ -616,9 +618,9 @@ const Model = {
                 // то обнулить значение планового простоя
                 this.setDelayPlan(stan, { working: false, delay_planned_time: 0 });
                 delays.setStopped(stan, delays.Working);
-            };
+            }
 
-            if ( (today.getMinutes() == 0) && (today.getSeconds() <= 10) ) {
+            if ( (today.getMinutes() === 0) && (today.getSeconds() <= 10) ) {
                 // Если текущее время - начало часа, обнулить ранее сохраненное значение внепланового простоя
                 delays.setDelayDuration(stan, 0);
                 result = 0;
@@ -631,7 +633,7 @@ const Model = {
             // Простой начался в прошлом часу?
             let delayStartHour = currDelay.delayStart.getHours();
             let currHour = today.getHours();
-            if (currHour - delayStartHour == 1) {
+            if (currHour - delayStartHour === 1) {
                 // считаем, сколько по времени стояли в прошлом часу
                 let startHour = new Date();
                 startHour.setMinutes(0);
@@ -670,7 +672,7 @@ const Model = {
                     result = delays.getDelayDuration(stan);
                 }
             }
-        };
+        }
 
         return result;
     },
@@ -685,7 +687,7 @@ const Model = {
         finish = this.toLocalDate(finish);
         let start = await this.getStartHour(finish);
 
-        var hour = finish.getUTCHours(); 
+        let hour = finish.getUTCHours();
         // Получаем фактически произведенную продукцию за период
         let fact = await this.getHourlyProd(stan, start, finish).catch(e => console.log(e));
         if (!fact) {
@@ -723,14 +725,17 @@ const Model = {
 
         let avg = 0;
         let nonPlanDelay = 0;
+        let profile = '';
+        let length = '';
+        let real_weight = 0;
+        let plan_weight = 0;
+        let percent = [];
+        let profileID = '';
+        let profileName = '';
+
         // Проход по строкам набора fact, выбор наименования профиля, поиск в таблице плана данный профиль и получение плана
-        if (stan == "s350") {
+        if (stan === "s350") {
             // Для стана 350
-            var profile = '';
-            var length = '';
-            var real_weight = 0;
-            var plan_weight = 0;
-            let percent = [];
             for (let row of fact) {
                 // Проверить на наличие записей (при простое возвращается пустой набор)
                 profile = row.Profile;
@@ -740,7 +745,7 @@ const Model = {
 
                 // Ищем план для текущего профиля
                 for (let pl of plan) {
-                    if (pl.Profile == profile) {
+                    if (pl.Profile === profile) {
                         if (length >= 10000) { plan_weight = pl.Long; break; }
                         if (length >= 8000 && length < 10000) { plan_weight = pl.Middle; break; }
                         if (length < 8000) { plan_weight = pl.Short; break; }
@@ -763,11 +768,6 @@ const Model = {
             avg = Math.round(avg / percent.length);
         } else {
             // Для стана 210
-            var profileID = '';
-            var profileName = '';
-            var real_weight = 0;
-            var plan_weight = 0;
-            let percent = [];
             for (row of fact) {
                 profileID = row.ProfileID;          // Наименование (1) профиля из таблицы фактического производства
                 profileName = row.ProfileName;      // Наименование (2) профиля из таблицы фактического производства
@@ -777,25 +777,27 @@ const Model = {
                 // Ищем в таблице планового производства Наименование (1)
                 for (let i = 0; i < plan.length; ++i) {
                     // Ищем по полю fact.ProfileID
-                    if (plan[i].ProfileName == profileID) {
+                    if (plan[i].ProfileName === profileID) {
                         // Нашли
                         delays.setError(stan, false);
                         plan_weight = plan[i].Plan;
                         break;
-                    };
-                };
-                if (plan_weight == 0) {
+                    }
+                }
+
+                if (plan_weight === 0) {
                     // Если не нашли по полю fact.ProfileID, ищем по полю fact.ProfileName
                     for (let i = 0; i < plan.length; ++i) {
-                        if (plan[i].ProfileName == profileName) {
+                        if (plan[i].ProfileName === profileName) {
                             // Нашли
                             delay.setError(stan, false);
                             plan_weight = plan[i].Plan;
                             break;
                         }
                     }
-                };
-                if (plan_weight == 0) {
+                }
+
+                if (plan_weight === 0) {
                     // Нет такого профиля в плане
                     delays.setError(stan, true);
                     // plan_weight = 112; // Если указан несуществующий профиль, то ставим средний план по всем профилям
@@ -842,7 +844,7 @@ const Model = {
             plan_date: date,
             s350: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ],
             s210: [ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
-        };
+        }
 
         let request = s350.request();
         request.input('ts', sql.DateTime, date);
@@ -884,7 +886,8 @@ const Model = {
             if (tmp < 10) strDate += '0';
             strDate += tmp;
             strDate += ' ';
-        };
+        }
+
         tmp = d.getUTCHours();
         if (tmp < 10) strDate += '0';
         strDate += tmp;
@@ -918,7 +921,7 @@ const Model = {
         let request = s350.request();
         let query; 
 
-        if (stan == 's350') {
+        if (stan === 's350') {
             query = s350Queries.planProd;
             let result = await request.query(query);
             if (result.recordset.length > 0) {
@@ -931,9 +934,9 @@ const Model = {
                     Data.push(r);
                 }
             }
-        };
+        }
 
-        if (stan == 's210') {
+        if (stan === 's210') {
             query = s210Queries.planProd;
             let result = await request.query(query);
             if (result.recordset.length > 0) {
@@ -962,7 +965,7 @@ const Model = {
         // Перебираем созданный ранее по всем профилям массив и выбираем строки, у которых 
         // совпадает значение часа, но различается длина и/или профиль
         let prof = [];
-        if (stan == "s350") {
+        if (stan === "s350") {
             let list350 = s350.request();
             list350.input("startTS", sql.DateTime, start);
             list350.input("finishTS", sql.DateTime, finish);
@@ -992,7 +995,7 @@ const Model = {
                 row['Weight'] = Weight;
                 row['Data'] = Data;
 
-                if (prof.length == 0) {
+                if (prof.length === 0) {
                     // Расчет времени проката
                     // Если в этом часу больше ничего не катали, то берем сначала часа
                     LengthTs = Number(Data) - Number(start);
@@ -1000,9 +1003,11 @@ const Model = {
                 } else {
                     LengthTs = Number(Data) - Number(prof[r-1].Data);
                     row['LengthTs'] = LengthTs;
-                };
+                }
+
                 prof.push(row); // Массив prof содержит все взвешенные пакеты за текущий час
-            };
+            }
+
         } else { 
             let list210 = s210.request();
             list210.input("startTS", sql.DateTime, start);
@@ -1022,7 +1027,7 @@ const Model = {
                 row['Weight'] = Weight;
                 row['Data'] = Data;
 
-                if (prof.length == 0) {
+                if (prof.length === 0) {
                     // Расчет времени проката
                     // Если в этом часу больше ничего не катали, то берем сначала часа
                     LengthTs = Number(Data) - Number(start);
@@ -1030,16 +1035,17 @@ const Model = {
                 } else {
                     LengthTs = Number(Data) - Number(prof[r-1].Data);
                     row['LengthTs'] = LengthTs;
-                };
+                }
+
                 prof.push(row); // Массив prof содержит все взвешенные пакеты за текущий час
-            };
+            }
         }
         return prof;
     },
 
     getHourlyProd: async function(stan, start, finish) {
         // Для стана 350
-        if (stan == 's350') {
+        if (stan === 's350') {
             const prof = await this.getProdList(stan, start, finish);
             let len = prof.length;
             if (len > 0) {
@@ -1054,7 +1060,7 @@ const Model = {
 
                 // Рассчитываем время фактического проката профиля в течение часа
                 for (let w=0; w<len; ++w) {
-                    if (profile == 0 && length == 0) {
+                    if (profile === 0 && length === 0) {
                         // Первый прокат в этом часе
                         profile = prof[w].Profile;
                         length = prof[w].Length;
@@ -1107,7 +1113,7 @@ const Model = {
                 let hours = [];
                 let rw = {};
                 for (row of prof) {
-                    if (profileID == 0 && profileName == 0) {
+                    if (profileID === 0 && profileName === 0) {
                         // Первый прокат в этом часе
                         profileID = row.ProfileID;
                         profileName = row.ProfileName;
@@ -1158,14 +1164,14 @@ const Model = {
         const startYear = new Date(stYear);
         let result_data = 0;
 
-        if (stan == 's350') {
+        if (stan === 's350') {
             let request = pool.request();
             request.input('startPeriod', startYear);
             let result = await request.query(s350Queries.prodPeriod).catch(e =>console.log(e));
             result_data = result.recordset[0].Weigth;
         }
 
-        if (stan == 's210') {
+        if (stan === 's210') {
             let request = pool.request();
             request.input('startPeriod', startYear);
             let result = await request.query(s210Queries.prodPeriod).catch(e =>console.log(e));
@@ -1180,14 +1186,14 @@ const Model = {
         const monthBegin = new Date(today.getFullYear(), today.getMonth() , 1, -4, 0, 0);
         let result_data = 0;
 
-        if (stan == 's350') {
+        if (stan === 's350') {
             let request = pool.request();
             request.input('startPeriod', monthBegin);
             let result = await request.query(s350Queries.prodPeriod).catch(e =>console.log(e));
             result_data = result.recordset[0].Weigth;
         }
 
-        if (stan == 's210') {
+        if (stan === 's210') {
             let request = pool.request();
             request.input('startPeriod', monthBegin);
             let result = await request.query(s210Queries.prodPeriod).catch(e =>console.log(e));
@@ -1195,6 +1201,6 @@ const Model = {
         }
         return result_data;
     },
-};
+}
 
 module.exports = Model;

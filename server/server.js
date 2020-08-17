@@ -33,9 +33,10 @@ app.use(function (req, res, next) {
 app.use('/api', require('./routes/api'));
 app.use('/', express.static(path.join(__dirname, '../dist')));
 
+var _port = config.get('port');
 //app.listen(8080);
-app.listen(config.get('port'), () => {
-    console.log('Server is running');
+app.listen(_port, () => {
+    console.log('Server is running on port ' + _port);
 });
 
 app.use(express.json());
