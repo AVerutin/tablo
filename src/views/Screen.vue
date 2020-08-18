@@ -70,7 +70,7 @@
 <!--                    -->
                 <tr class="delay" v-if="(s210.error === true)">
                     <td class="error">ВНИМАНИЕ!</td>
-                    <td colspan="4" class="error_line">НЕВЕРНО УКАЗАН ПРОФИЛЬ</td>
+                    <td colspan="4" class="error_line"><span class="wrong_profile">НЕВЕРНЫЙ ПРОФИЛЬ: {{ s210.wrong_profile }}</span></td>
                 </tr>
 <!--                    -->
                 <tr v-if="s210.working">
@@ -140,6 +140,7 @@
                     name: 's350',
                     need_reset_timer: false,
                     error: false,
+                    wrong_profile: ''
                 },
                 s210: {
                     dev_shift: [0, 0, 0, 0, 0],
@@ -156,6 +157,7 @@
                     name: 's210',
                     need_reset_timer: false,
                     error: false,
+                    wrong_profile: ''
                 },
                 current_brigade: 0,
                 temp_in: 0,
@@ -170,7 +172,7 @@
                 loginError: false,
                 auth: false,
                 spc_month: 0,
-                spc_year: 0
+                spc_year: 0,
             }
         },
         name: 'Screen',
@@ -331,16 +333,7 @@
                 }
 
             },
-            // // TEST MY API
-            // async getProfiles() {
-            //     await this.$http({
-            //         url: process.env.VUE_APP_SERVER_URL + '/api/getProfiles',
-            //         method: 'get',
-            //     }).then(responce => {
-            //         console.log(response.hourBegin);
-            //     });
-            // },
-            // // TEST MY API
+
             async setDevPlan() {
                 await this.$http({
                     url: process.env.VUE_APP_SERVER_URL + '/api/dev_plan',
@@ -402,6 +395,11 @@
         vertical-align: middle;
         text-align: center;
         font-size: 18px;
+    }
+
+    .wrong_profile {
+        color: darkred;
+        font-weight: bold;
     }
 
     table, td, th {

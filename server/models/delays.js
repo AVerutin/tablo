@@ -66,22 +66,30 @@ const Delays = {
         if (!value) {
             value = {};
             value.Error = false;
+            value.WrongProfile = '';
             local.set(stan, value);
         }
         if (!value.Error) {
             value.Error = false;
+            value.WrongProfile = '';
+            local.set(stan, value);
+        }
+        if (!value.WrongProfile) {
+            value.Error = false;
+            value.WrongProfile = '';
             local.set(stan, value);
         }
 
-        return value.Error;
+        return value;
     },
 
-     setError: function(stan, error) {
+     setError: function(stan, error, profile) {
         let value = local.get(stan);
         if (!value) {
             value = {};
         }
         value.Error = error;
+        value.WrongProfile = profile;
         local.set(stan, value);
      },
 

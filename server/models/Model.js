@@ -124,7 +124,7 @@ let s210Queries = {
         "\n" +
         "FROM [ABINSK_RMRT].[dbo].[STP_STOPPAGE]\n" +
         "WHERE [START_DELAY] < @shift_end AND [END_DELAY] > @shift_start",
-    planProd: "SELECT * FROM [L2Mill].[dbo].[Dev_Plan_210_Profiles]",
+    planProd: "SELECT * FROM [L2Mill].[dbo].[DevPlan_210_Profiles]",
     statsQuery: "CREATE TABLE #sheldule (id_sheldule TINYINT IDENTITY, brigade TINYINT);\n" +
         " INSERT INTO #sheldule VALUES (2), (1), (3), (2), (4), (3), (1), (4);\n" +
         "CREATE TABLE #billets (\n" +
@@ -227,6 +227,7 @@ const Model = {
                 start_year: 0,
                 need_reset_timer: false,
                 error: false,
+                wrong_profile: ''
             }
 
             // Получение данных о производственых показателях предыдущих бригад
@@ -235,6 +236,7 @@ const Model = {
             stats.start_month = Math.round(await this.getFromStartMonth(stan, pool) / 1000.0); // Получение показателей по станам с начала месяца
             let resultCurDelay = await request.query(queries.getCurDelay); // Получение данных о текущей остановке стана
 
+            // Получаем статус ошибки наименования профиля на стане 210
             let err = delays.getError(stan);
             
             // Расчет по текущей остановке стана
@@ -255,9 +257,10 @@ const Model = {
                 } else {
                     stats.need_reset_timer = false;
                 }
-                if (err) {
+                if (err.Error) {
                     stats.working = false;
                     stats.error = true;
+                    stats.wrong_profile = err.WrongProfile;
                 }
             }
 
@@ -341,7 +344,6 @@ const Model = {
         return res;
     },
     
-
     // Сохранение подготовленного состояния по всем часам работы бригады
     saveHourlyPercent: async function(stan, data, local, hour) {
         // Сохранение состояния по часам
@@ -512,10 +514,6 @@ const Model = {
             // Заступила новая бригада, нужно обнулить почасовые показатели
             // Сохранить время начала текущей бригады в БД
 
-            //FIXME: Отладить и добавить функцию сохранения времени начала смены
-            // let bDat = new Date ( this.dateToString(currBrig.BDate));
-            // bDat = Number(bDat) + 10800000;
-            // let brigDate = new Date(this.dateToString(bDat));
             await brigades.saveShiftTime(s350, currBrig.ID, currBrig.BDate);
 
             reseted = await this.resetHourlyStats(toLocal);
@@ -769,28 +767,28 @@ const Model = {
         } else {
             // Для стана 210
             for (row of fact) {
-                profileID = row.ProfileID;          // Наименование (1) профиля из таблицы фактического производства
+                // profileID = row.ProfileID;          // Наименование (1) профиля из таблицы фактического производства
                 profileName = row.ProfileName;      // Наименование (2) профиля из таблицы фактического производства
                 real_weight = Math.round(row.Weight / 1000); // Пересчитаем вес в тонны
                 duration = row.Duration;
 
                 // Ищем в таблице планового производства Наименование (1)
-                for (let i = 0; i < plan.length; ++i) {
-                    // Ищем по полю fact.ProfileID
-                    if (plan[i].ProfileName === profileID) {
-                        // Нашли
-                        delays.setError(stan, false);
-                        plan_weight = plan[i].Plan;
-                        break;
-                    }
-                }
+                // for (let i = 0; i < plan.length; ++i) {
+                //     // Ищем по полю fact.ProfileID
+                //     if (plan[i].ProfileName === profileID) {
+                //         // Нашли
+                //         delays.setError(stan, false);
+                //         plan_weight = plan[i].Plan;
+                //         break;
+                //     }
+                // }
 
                 if (plan_weight === 0) {
                     // Если не нашли по полю fact.ProfileID, ищем по полю fact.ProfileName
                     for (let i = 0; i < plan.length; ++i) {
                         if (plan[i].ProfileName === profileName) {
                             // Нашли
-                            delay.setError(stan, false);
+                            delay.setError(stan, false, '');
                             plan_weight = plan[i].Plan;
                             break;
                         }
@@ -799,9 +797,9 @@ const Model = {
 
                 if (plan_weight === 0) {
                     // Нет такого профиля в плане
-                    delays.setError(stan, true);
-                    // plan_weight = 112; // Если указан несуществующий профиль, то ставим средний план по всем профилям
+                    delays.setError(stan, true, profileName);
                 }
+
                 // Учитываем время внепланового простоя, если он был
                 nonPlanDelay = await this.getNonPlanDelay(stan);
                 finish = new Date( Number(finish) + nonPlanDelay );
@@ -1113,7 +1111,7 @@ const Model = {
                 let hours = [];
                 let rw = {};
                 for (row of prof) {
-                    if (profileID === 0 && profileName === 0) {
+                    if (profileID === '' && profileName === '') {
                         // Первый прокат в этом часе
                         profileID = row.ProfileID;
                         profileName = row.ProfileName;
