@@ -1063,7 +1063,7 @@ const Model = {
                         // Первый прокат в этом часе
                         profile = prof[w].Profile;
                         length = prof[w].Length;
-                        weight = prof[w].Weight;
+                        weight = prof[w].Weight;//
                         duration = prof[w].LengthTs;
                         hour = start.getUTCHours().toString();
                     } else {
