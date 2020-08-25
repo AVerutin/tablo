@@ -70,7 +70,7 @@
 <!--                    -->
                 <tr class="delay" v-if="(s210.error === true)">
                     <td class="error">ВНИМАНИЕ!</td>
-                    <td colspan="4" class="error_line"><span class="wrong_profile">НЕВЕРНЫЙ ПРОФИЛЬ: {{ s210.wrong_profile }}</span></td>
+                    <td colspan="4" class="error_line"><span class="wrong_profile">НЕВЕРНО УКАЗАН ПРОФИЛЬ: {{ s210.wrong_profile }}</span></td>
                 </tr>
 <!--                    -->
                 <tr v-if="s210.working">

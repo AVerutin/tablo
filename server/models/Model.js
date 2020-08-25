@@ -768,7 +768,8 @@ const Model = {
             // Для стана 210
             for (row of fact) {
                 // profileID = row.ProfileID;          // Наименование (1) профиля из таблицы фактического производства
-                profileName = row.ProfileName;      // Наименование (2) профиля из таблицы фактического производства
+                profileName = row.ProfileName.toUpperCase();      // Наименование (2) профиля из таблицы фактического производства
+                profileName = profileName.replace(',', '.');
                 real_weight = Math.round(row.Weight / 1000); // Пересчитаем вес в тонны
                 duration = row.Duration;
 
@@ -788,7 +789,7 @@ const Model = {
                     for (let i = 0; i < plan.length; ++i) {
                         if (plan[i].ProfileName === profileName) {
                             // Нашли
-                            delay.setError(stan, false, '');
+                            delays.setError(stan, false, '');
                             plan_weight = plan[i].Plan;
                             break;
                         }
