@@ -8,7 +8,7 @@ const debug = require("./debug_log");
 const delays = require('./delays');
 
 const _DEBUG = false;
-const toLocal = false;
+const toLocal = true;
 
 let s350Queries = {
     getStatBrigades: "SELECT [ID], [BPercent350], [BWeight350], [BPercent210], [BWeight210] FROM [L2Mill].[dbo].[BrigadaStats] ORDER BY [ID];",
@@ -285,9 +285,24 @@ const Model = {
         let delStart, delEnd, delDuration  = 0;
 
         // Получаем список всех простоев за смену
+        //FIXME: Корректировка времени начала и окончания простоя по границам смены
         for (let delay of delays.recordset) {
-            delStart = Math.max(row.beginTS, delay.start);      // Либо время начала смены, либо время начала простоя
-            delEnd = Math.min(row.endTS, delay.finish);         // Либо время конца смены, либо время окончания простоя
+            // Если простой начался в предыдущей смене, то учитывыаем его с начала смены
+            if (delay.start < row.beginTS) {
+                delStart = row.beginTS;
+            } else {
+                delStart = delay.start;
+            }
+
+            // Если простой закончился в следующей смене, то учитываем его до конца смены
+            if (delay.finish > row.endTS) {
+                delEnd = row.endTS;
+            } else {
+                delEnd = delay.finish;
+            }
+
+            // delStart = Math.max(row.beginTS, delay.start);      // Либо время начала смены, либо время начала простоя
+            // delEnd = Math.min(row.endTS, delay.finish);         // Либо время конца смены, либо время окончания простоя
             delDuration += Math.max( delEnd - delStart , 0);    // Складываем время всех простоев за смену
         }
         delDuration = Math.min(delDuration, 12 * 3600000);      // Либо вся смена (12 часов), либо сумма всех простоев за смену

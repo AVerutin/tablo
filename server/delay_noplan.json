@@ -1,13 +1,13 @@
 {
   "s350": {
-    "Stopped": 3,
+    "Stopped": 4,
     "Duration": 2819272,
     "Error": false,
     "WrongProfile": ""
   },
   "s210": {
     "Stopped": 4,
-    "Duration": 425287,
+    "Duration": 0,
     "Error": false,
     "WrongProfile": ""
   }
